@@ -8,4 +8,7 @@ setup(name='heudiconv_helpers',
       author_email='nimhdsst@gmail.com',
       license='Public Domain',
       packages=['heudiconv_helpers'],
+      install_requires=[
+          'numpy',
+      ],
       zip_safe=False)
