@@ -1,6 +1,6 @@
 from collections import deque
 import numpy as np
-import pathlib as Path
+from pathlib import  Path
 import pandas as pd
 import json
 
@@ -178,7 +178,7 @@ values_to_set=None):
     assert fieldnames is not None
     assert action in ['delete', 'get', 'set']
 
-    json_path = Path(row['json_col'])
+    json_path = Path(row[json_col])
     with json_path.open() as j:
         data = json.load(j)
 
