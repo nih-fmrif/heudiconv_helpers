@@ -1,5 +1,9 @@
 from collections import deque
 import numpy as np
+import pathlib as Path
+import pandas as pd
+import json
+
 
 
 def gen_slice_timings(tr, nslices, nvolumes=1, pattern='alt+z'):
@@ -61,3 +65,131 @@ def gen_slice_timings(tr, nslices, nvolumes=1, pattern='alt+z'):
     output = np.hstack([np.array(tr_timings) + n for n in range(nvolumes)])
     output = list(float(str(np.round(oo, 6))) for oo in output)
     return output
+
+
+
+def write_json(path, data):
+    path = Path(path)
+    path.write_text(json.dumps(data, indent=0))
+
+
+def _get_fields(row, data, fieldnames):
+    for f_idx, field in enumerate(fieldnames):
+        tmp = data
+        if isinstance(field, tuple):
+
+            for ii, key in enumerate(field):
+                    try:
+                        if ii == (len(field) - 1):
+                            # tmp[key] = values_to_set[f_idx]
+                            row = row.append(pd.Series({'_'.join(field): tmp[key]}))
+                        else:
+                            tmp[key]
+                            tmp = tmp[key]
+                    except KeyError:
+                        row = row.append(pd.Series({'_'.join(field): np.nan}))
+        else:
+            try:
+                row = row.append(pd.Series({field: data[field]}))
+            except KeyError:
+                row = row.append(pd.Series({field: np.nan}))
+
+    return row
+
+
+def _set_fields(data, fieldnames, values_to_set):
+
+    for f_idx, field in enumerate(fieldnames):
+        tmp = data
+        if isinstance(field, tuple):
+
+            for ii, key in enumerate(field):
+                    try:
+                        if ii == (len(field) - 1):
+                            tmp[key] = values_to_set[f_idx]
+                        else:
+                            tmp[key]
+                            tmp = tmp[key]
+                    except KeyError:
+                            pass
+        else:
+            data[field] = values_to_set[f_idx]
+
+    return data
+
+
+def _del_fields(j_in, fieldnames):
+    """
+    Remove fields from json data inplace.
+    Each field name should be  a tuple.
+    """
+    for field in fieldnames:
+        tmp = j_in
+        if isinstance(field, tuple):
+            for i, l in enumerate(field):
+                try:
+                    if i == (len(field) - 1):
+                        del tmp[l]
+                    else:
+                        tmp[l]
+                        tmp = tmp[l]
+                except KeyError:
+                        pass
+#                         print(f, ' not found as a json field')
+        else:
+            try:
+                del tmp[field]
+            except KeyError:
+                        pass
+#                         print(f, ' not found as a json field')
+
+
+def modify_json_fields(row,json_col='json_path',fieldnames=None,action='get',
+values_to_set=None):
+    """
+    For mapping operations with json files across dataframe rows.
+
+    Parameters
+    ----------
+    row: pd.Series
+        Dataframe row containing a column that has a path to a json.
+    json_col: string
+        Name of Dataframe column that contains the path to an appropriate json
+    fieldnames: tuple,str or a list of either/both
+       One or more json fieldnames to perform an action with. Nested
+        fieldnames should be expressed as a tuple of strings.
+    action: string, one of ('get', 'set', 'delete')
+        'get' will return an updated row with the retrieved fieldnames. 'set'
+    will write to the provided fieldnames in the json file. 'delete' removes
+    the provided fieldnames from the json file.
+    values_to_set: str,iterable
+        Must match fieldnames in number. Can only be used when action is 'set'.
+
+     Returns
+    -------
+    row: for get the returned row will be modified
+
+    Example usage:
+    df.apply(lambda row: modify_json_fields(row,
+                         fieldnames = ['SliceTiming',('primary_field','AcquisitionTime')],
+                         action = 'set',
+                         values_to_set = [[0,0.2,0.4,0.6],"15.20.00"])
+    """
+    assert fieldnames is not None
+    assert action in ['delete', 'get', 'set']
+
+    json_path = Path(row['json_col'])
+    with json_path.open() as j:
+        data = json.load(j)
+
+    if action == 'get':
+        row = _get_fields(row, data, fieldnames)
+    if action == 'set':
+        data = _set_fields(data, fieldnames, values_to_set)
+        write_json(json_path, data)
+    if action == 'delete':
+        _del_fields(data, fieldnames)
+        write_json(json_path, data)
+
+    return row
+
