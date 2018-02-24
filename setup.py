@@ -10,5 +10,7 @@ setup(name='heudiconv_helpers',
       packages=['heudiconv_helpers'],
       install_requires=[
           'numpy',
+          'pandas',
+          'pytest'
       ],
       zip_safe=False)

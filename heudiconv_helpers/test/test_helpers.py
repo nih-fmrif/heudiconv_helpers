@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import pytest
 from pandas.util.testing import assert_series_equal
 
 from heudiconv_helpers import gen_slice_timings
@@ -17,6 +18,14 @@ def test_gen_slice_timings():
     assert gen_slice_timings(1, 5, 1, 'alt-z2') == [0.8, 0.2, 0.6, 0.0, 0.4]
     assert gen_slice_timings(1, 5, 1, 'seqplus') == [0.0, 0.2, 0.4, 0.6, 0.8]
     assert gen_slice_timings(1, 5, 1, 'seqminus') == [0.8, 0.6, 0.4, 0.2, 0.0]
+    # returns nan if arguments are nan
+    assert np.isnan(gen_slice_timings(1, 5, np.nan, 'seqminus'))
+    assert np.isnan(gen_slice_timings(np.nan, 5, 1, 'seqminus'))
+    assert np.isnan(gen_slice_timings(1, np.nan, 1, 'seqminus'))
+    # turns float arguments to int if they are rounded
+    assert gen_slice_timings(1.0, 5.0, 1.0, 'seqminus') == [0.8, 0.6, 0.4, 0.2, 0.0]
+    with pytest.raises(ValueError):
+    	gen_slice_timings(1.9, 5.1, 1.0, 'seqminus') == [0.8, 0.6, 0.4, 0.2, 0.0]
 
 
 def test_del_fields():

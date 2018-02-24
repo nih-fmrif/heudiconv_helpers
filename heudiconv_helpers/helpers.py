@@ -6,6 +6,15 @@ import json
 
 
 
+
+def coerce_to_int(num,name):
+    if np.isclose(num,int(num)):
+        num = int(num)
+    else:
+        raise ValueError("%s must be an integer or a rounded float"%name)
+    return num
+
+
 def gen_slice_timings(tr, nslices, nvolumes=1, pattern='alt+z'):
     """Generate slice timings for all slices collected in some number of volumes.
 
@@ -23,17 +32,16 @@ def gen_slice_timings(tr, nslices, nvolumes=1, pattern='alt+z'):
 
     Returns
     -------
-    output: list of floats
-        List of floats for slice timing in same units as tr
+    output: list of floats or np.nan
+        List of floats for slice timing in same units as tr.
+        np.nan is returned if any of the arguments are nan.
     """
-
-    try:
-        if np.isclose(nslices,int(nslices)):
-            nslices = int(nslices)
-        if np.isclose(nvolumes,int(nvolumes)):
-            nvolumes = int(nvolumes)
-    except ValueError:
+    if any(np.isnan([tr,nslices,nvolumes])):
         return np.nan
+    tr = coerce_to_int(tr,"tr")
+    nslices = coerce_to_int(nslices,"nslices")
+    nvolumes = coerce_to_int(nvolumes,"nvolumes")
+
     ordered_times = [tt for tt in np.linspace(0, tr, nslices+1)][:-1]
     middle = int((nslices % 2) + len(ordered_times)/2)
     first_half = ordered_times[:middle]
