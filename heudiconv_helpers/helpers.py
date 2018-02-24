@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import  Path
 import pandas as pd
 import json
+import platform
 
 
 
@@ -207,4 +208,105 @@ values_to_set=None):
         write_json(json_path, data)
 
     return row
+
+
+def host_is_hpc(sim=False,host_simulated="helix.nih.gov"):
+    if sim:
+        host = host_simulated
+    else:
+        try:
+            host = platform.node()
+        except:
+            host = ""
+    if any(h in host for h in ['biowulf','helix','felix']):
+        hpc = True
+    else:
+        hpc = False
+
+
+    return hpc
+
+
+def test_host_is_hpc():
+    assert host_is_hpc(sim=True) == True
+    assert host_is_hpc(sim=True,host_simulated = "a_host_name") == False
+
+
+def make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=None,conv_dir=None,\
+                                 anon_script=None,conversion=False,minmeta=False, \
+                        overwrite=True,debug=False,dev=False,use_scratch=False):
+
+    if not heuristics_script:
+        # use heuristics script inside container
+        heuristics_script = '/src/heudiconv/heuristics/convertall.py'
+    else:
+        heuristics_script = Path('/data').joinpath(heuristics_script).as_posix()
+    if host_is_hpc():
+        cmd = 'module load singularity;'
+    else:
+        cmd = ''
+
+    project_dir = Path(project_dir).as_posix()
+    output_dir = Path(output_dir).as_posix()
+#     cmd = cmd + \
+#     'module load Anaconda;source deactivate;' +\
+    cmd += \
+    ' singularity exec' + \
+    ' --bind ' + project_dir + ':/data'
+
+    if dev:
+        if host_is_hpc():
+            cmd += ' --bind /home/rodgersleejg/Documents/code/heudiconv_project/heudiconv/heudiconv:/opt/conda/envs/neuro/lib/python2.7/site-packages/heudiconv'
+        else:
+            assert False
+
+    if use_scratch:
+        cmd += ' --bind /lscratch/$SLURM_JOB_ID:/tmp'
+    else:
+        print('Not using scratch.')
+        cmd += ' --bind /tmp:/tmp'
+
+    cmd += ' ' + container_image.as_posix() + \
+    " bash -c 'source activate neuro; /neurodocker/startup.sh heudiconv" + \
+    ' -d ' + row.dicom_template + \
+    ' -s ' + row.bids_subj + \
+    ' -ss ' + row.bids_ses + \
+    ' -f ' + heuristics_script + \
+    ' -b'
+
+    if overwrite:
+        cmd += ' --overwrite'
+    if output_dir is not None:
+        output_dir = Path(output_dir).as_posix()
+        cmd += ' -o ' + output_dir
+
+    if conv_dir is not None:
+        conv_dir = Path(conv_dir).as_posix()
+        cmd += ' --conv-outdir ' + conv_dir
+
+    if debug:
+        cmd += ' --dbg'
+
+    if minmeta:
+        cmd += ' --minmeta'
+
+    if conversion:
+        cmd += ' -c dcm2niix'
+    else:
+
+        cmd += ' -c none'
+    cmd += "'"
+    return cmd
+
+
+def test_heud_call():
+    row = pd.Series({'dicom_template':"the_template","bids_subj":"the_subj","bids_ses":"the_sess"})
+    # make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=None,conv_dir=None,\
+    #                              anon_script=None,conversion=False,minmeta=False, \
+    #                     overwrite=True,debug=False,dev=False,use_scratch=False):
+
+    print(make_heud_call(row,Path.cwd(),Path.cwd(),Path('sing_path'),\
+            conversion=False,minmeta=False,\
+                            overwrite=True,debug=False,dev=False,use_scratch=False) )
+
 
