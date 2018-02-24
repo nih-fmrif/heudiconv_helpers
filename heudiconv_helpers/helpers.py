@@ -13,9 +13,9 @@ def gen_slice_timings(tr, nslices, nvolumes=1, pattern='alt+z'):
     ----------
     tr: float
         Repitition Time in same units as desired for output
-    nslices: int
+    nslices: int, float
         Number of slices collected in each tr
-    nvolumes: int, optional
+    nvolumes: int, float  optional
         Number of volumes you would like slice timings for
     pattern: string, one of ('altplus', 'alt+z', 'alt+z2', 'altminus', 'alt-z',
                              'alt-z2', 'seq+z', 'seqplus', 'seq-z', seqminus')
@@ -27,6 +27,13 @@ def gen_slice_timings(tr, nslices, nvolumes=1, pattern='alt+z'):
         List of floats for slice timing in same units as tr
     """
 
+    try:
+        if np.isclose(nslices,int(nslices)):
+            nslices = int(nslices)
+        if np.isclose(nvolumes,int(nvolumes)):
+            nvolumes = int(nvolumes)
+    except ValueError:
+        return np.nan
     ordered_times = [tt for tt in np.linspace(0, tr, nslices+1)][:-1]
     middle = int((nslices % 2) + len(ordered_times)/2)
     first_half = ordered_times[:middle]
