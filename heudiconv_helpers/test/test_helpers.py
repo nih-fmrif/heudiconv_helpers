@@ -2,11 +2,15 @@ import pandas as pd
 import numpy as np
 import pytest
 from pandas.util.testing import assert_series_equal
+from pathlib import Path
 
 from heudiconv_helpers import gen_slice_timings
 from heudiconv_helpers.helpers import _set_fields
 from heudiconv_helpers.helpers import _get_fields
 from heudiconv_helpers.helpers import _del_fields
+from heudiconv_helpers.helpers import make_heud_call
+from heudiconv_helpers.helpers import _get_outcmd
+from heudiconv_helpers.helpers import host_is_hpc
 
 
 def test_gen_slice_timings():
@@ -114,4 +118,27 @@ def test_get_fields():
                                   'a_b_d': np.nan,
                                    'e': np.nan}).
                         sort_index())
+
+
+def test_host_is_hpc():
+    assert host_is_hpc(sim=True) is True
+    assert host_is_hpc(sim=True, host_simulated="a_host_name") is False
+
+
+def test_get_outcmd():
+    assert f' -o {Path.cwd()}' == _get_outcmd(Path.cwd())
+
+
+def test_heud_call():
+    row = pd.Series({'dicom_template': "the_template",
+                     "bids_subj": "the_subj", "bids_ses": "the_sess"})
+    cmd = make_heud_call(row=row,
+                         project_dir="proj",
+                         output_dir=Path.cwd(),
+                         container_image=Path('sing_path'),
+                         conversion=False, minmeta=False,
+                         overwrite=True,
+                         debug=False,
+                         dev=False,
+                         use_scratch=False)
 

@@ -159,8 +159,8 @@ def _del_fields(j_in, fieldnames):
 #                         print(f, ' not found as a json field')
 
 
-def modify_json_fields(row, json_col='json_path', fieldnames=None,
-                       action='get', values_to_set=None):
+def json_action(row, json_col='json_path', fieldnames=None,
+                action='get', values_to_set=None):
     """
     For mapping operations with json files across dataframe rows.
 
@@ -186,7 +186,7 @@ def modify_json_fields(row, json_col='json_path', fieldnames=None,
 
     Examples
     -------
-    df.apply(lambda row: modify_json_fields(row,
+    df.apply(lambda row: json_action(row,
                          fieldnames = ['SliceTiming',
                          ('primary_field',
                          'AcquisitionTime')],
@@ -228,11 +228,6 @@ def host_is_hpc(sim=False, host_simulated="helix.nih.gov"):
     return hpc
 
 
-def test_host_is_hpc():
-    assert host_is_hpc(sim=True) is True
-    assert host_is_hpc(sim=True, host_simulated="a_host_name") is False
-
-
 def _get_dev_str(options):
     if options.pop('dev'):
         dev_dir = options.pop('dev_dir')
@@ -243,7 +238,7 @@ def _get_dev_str(options):
         dev_str = ""
         if options.pop('dev_dir'):
             raise ValueError("dev_dir can only be specified if dev = True")
-    return options, dev_str
+    return dev_str, options
 
 
 def _get_tmp_str(options):
@@ -252,7 +247,7 @@ def _get_tmp_str(options):
     else:
         print('Not using scratch.')
         tmp_str = ' --bind /tmp:/tmp'
-    return options, tmp_str
+    return tmp_str, options
 
 
 def _get_setup():
@@ -271,7 +266,7 @@ def _get_heur(options):
     else:
         path = Path('/data').joinpath(script).as_posix()
         heur = " -f %s" % script
-    return options, heur
+    return heur, options
 
 
 def _get_conv(options):
@@ -280,7 +275,7 @@ def _get_conv(options):
     else:
         conv = ' -c none'
 
-    return options, conv
+    return conv, options
 
 
 def _get_outcmd(output_dir):
@@ -292,10 +287,6 @@ def _get_outcmd(output_dir):
     return out
 
 
-def test_get_outcmd():
-    assert f' -o {Path.cwd()}' == _get_outcmd(Path.cwd())
-
-
 def _get_other_cmds(options, options_dict):
     cmd = ''
     for k, v in options.items():
@@ -303,20 +294,6 @@ def _get_other_cmds(options, options_dict):
             cmd += ' ' + options_dict[k]
 
     return cmd
-
-
-def test_heud_call():
-    row = pd.Series({'dicom_template': "the_template",
-                     "bids_subj": "the_subj", "bids_ses": "the_sess"})
-    cmd = make_heud_call(row=row,
-                         project_dir="proj",
-                         output_dir=Path.cwd(),
-                         container_image=Path('sing_path'),
-                         conversion=False, minmeta=False,
-                         overwrite=True,
-                         debug=False,
-                         dev=False,
-                         use_scratch=False)
 
 
 def make_heud_call(*, row=None, project_dir=None, output_dir=None,
@@ -334,8 +311,9 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
        Path to output directory relative to the project_dir.
     container_image: pathlib.Path,string
         Path to heudiconv singularity image.
-    heuristics_script: None,
-    anon_script: None,
+    heuristics_script: default convertall.py within the container
+        Path to heuristic script relative to project_dir
+    anon_script: path, default None
     conversion: bool, default False
         Use dcm2niix to convert the dicoms.
     minmeta: bool, default False
@@ -362,7 +340,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
                      project_dir = project_dir_absolute,
                      output_dir=outdir,
                      conversion = False,
-                     sing_image = sing_image))
+                     container_image = sing_image))
           )
     """
     options = OrderedDict({
@@ -380,10 +358,10 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     pbind = " --bind %s:/data" % Path(project_dir).as_posix()
     img = ' %s' % Path(container_image).absolute()
     setup = _get_setup()
-    options, dev_str = _get_dev_str(options)
-    options, tmp_str = _get_tmp_str(options)
-    options, heur = _get_heur(options)
-    options, conv = _get_conv(options)
+    dev_str, options = _get_dev_str(options)
+    tmp_str, options = _get_tmp_str(options)
+    heur, options = _get_heur(options)
+    conv, options = _get_conv(options)
     outcmd = _get_outcmd(output_dir)
 
     # for options that simply append another flag
