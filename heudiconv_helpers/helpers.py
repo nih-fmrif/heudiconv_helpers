@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, OrderedDict
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -159,8 +159,8 @@ def _del_fields(j_in, fieldnames):
 #                         print(f, ' not found as a json field')
 
 
-def modify_json_fields(row, json_col='json_path', fieldnames=None, action='get',
-                       values_to_set=None):
+def modify_json_fields(row, json_col='json_path', fieldnames=None,
+                       action='get', values_to_set=None):
     """
     For mapping operations with json files across dataframe rows.
 
@@ -184,9 +184,12 @@ def modify_json_fields(row, json_col='json_path', fieldnames=None, action='get',
     -------
     row: for get the returned row will be modified
 
-    Example usage:
+    Examples
+    -------
     df.apply(lambda row: modify_json_fields(row,
-                         fieldnames = ['SliceTiming',('primary_field','AcquisitionTime')],
+                         fieldnames = ['SliceTiming',
+                         ('primary_field',
+                         'AcquisitionTime')],
                          action = 'set',
                          values_to_set = [[0,0.2,0.4,0.6],"15.20.00"])
     """
@@ -226,19 +229,87 @@ def host_is_hpc(sim=False, host_simulated="helix.nih.gov"):
 
 
 def test_host_is_hpc():
-    assert host_is_hpc(sim=True) == True
-    assert host_is_hpc(sim=True, host_simulated="a_host_name") == False
+    assert host_is_hpc(sim=True) is True
+    assert host_is_hpc(sim=True, host_simulated="a_host_name") is False
+
+
+def _get_dev_str(options):
+    if options.pop('dev'):
+        dev_dir = options.pop('dev_dir')
+        heud_path = \
+            '/opt/conda/envs/neuro/lib/python2.7/site-packages/heudiconv'
+        dev_str = ' --bind %s/heudiconv:%s' % dev_dir, heud_path
+    else:
+        dev_str = ""
+        if options.pop('dev_dir'):
+            raise ValueError("dev_dir can only be specified if dev = True")
+    return options, dev_str
+
+
+def _get_tmp_str(options):
+    if options.pop('use_scratch'):
+        tmp_str = ' --bind /lscratch/$SLURM_JOB_ID:/tmp'
+    else:
+        print('Not using scratch.')
+        tmp_str = ' --bind /tmp:/tmp'
+    return options, tmp_str
+
+
+def _get_setup():
+    if host_is_hpc():
+        setup = 'module load singularity;'
+    else:
+        setup = ""
+    return setup
+
+
+def _get_heur(options):
+    script = options.pop("heuristics_script")
+    if not script:
+        # use heuristics script inside container
+        heur = ' -f /src/heudiconv/heuristics/convertall.py'
+    else:
+        path = Path('/data').joinpath(script).as_posix()
+        heur = " -f %s" % script
+    return options, heur
+
+
+def _get_conv(options):
+    if options.pop('conversion'):
+        conv = ' -c dcm2niix'
+    else:
+        conv = ' -c none'
+
+    return options, conv
+
+
+def _get_outcmd(output_dir):
+    if output_dir is not None:
+        out = Path(output_dir).as_posix()
+        out = f' -o {output_dir}'
+    else:
+        out = ""
+    return out
+
+
+def test_get_outcmd():
+    assert f' -o {Path.cwd()}' == _get_outcmd(Path.cwd())
+
+
+def _get_other_cmds(options, options_dict):
+    cmd = ''
+    for k, v in options.items():
+        if v:
+            cmd += ' ' + options_dict[k]
+
+    return cmd
 
 
 def test_heud_call():
     row = pd.Series({'dicom_template': "the_template",
                      "bids_subj": "the_subj", "bids_ses": "the_sess"})
-    # make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=None,conv_dir=None,\
-    #                              anon_script=None,conversion=False,minmeta=False, \
-    #                     overwrite=True,debug=False,dev=False,use_scratch=False):
-
-    cmds = make_heud_call(row=row,
-                         project_dir=Path.cwd(),
+    cmd = make_heud_call(row=row,
+                         project_dir="proj",
                          output_dir=Path.cwd(),
                          container_image=Path('sing_path'),
                          conversion=False, minmeta=False,
@@ -246,14 +317,12 @@ def test_heud_call():
                          debug=False,
                          dev=False,
                          use_scratch=False)
-    assert False
-
 
 
 def make_heud_call(*, row=None, project_dir=None, output_dir=None,
                    container_image=None, **kwargs):
     """
-    Returns command for executing heudiconv in a container.
+    Creates a command for executing heudiconv in a container.
 
     Parameters
     ----------
@@ -266,7 +335,6 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     container_image: pathlib.Path,string
         Path to heudiconv singularity image.
     heuristics_script: None,
-    conv_dir: None,
     anon_script: None,
     conversion: bool, default False
         Use dcm2niix to convert the dicoms.
@@ -278,105 +346,61 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
         Drop into pdb upon error.
     dev: bool, default False
         Mount heudiconv code repo to container.
+    dev_dir: pathlib.Path, string
+        repo to be mounted to the container.
     use_scratch: bool, default False
         Mount /lscratch/$SLURM_JOB_ID to containers tmp directory.
 
-     Returns
+    Returns
     -------
-    row: for get the returned row will be modified
+    cmd: string containing appropriate command
 
-    Example usage:
-    df.apply(lambda row: modify_json_fields(row,
-                         fieldnames = ['SliceTiming',('primary_field','AcquisitionTime')],
-                         action = 'set',
-                         values_to_set = [[0,0.2,0.4,0.6],"15.20.00"])
+    Examples
+    -------
+    df.assign(cmd = lambda df:
+        make_heud_call(row = df,
+                     project_dir = project_dir_absolute,
+                     output_dir=outdir,
+                     conversion = False,
+                     sing_image = sing_image))
+          )
     """
-
-
-    default_for_kwargs = {
+    options = OrderedDict({
         "heuristics_script": None,
-        "conv_dir": None,
         "anon_script": None,
         "conversion": False,
         "minmeta": False,
         "overwrite": True,
         "debug": False,
         "dev": False,
+        "dev_dir": None,
         "use_scratch": False
+    })
+    options.update(kwargs)
+    pbind = " --bind %s:/data" % Path(project_dir).as_posix()
+    img = ' %s' % Path(container_image).absolute()
+    setup = _get_setup()
+    options, dev_str = _get_dev_str(options)
+    options, tmp_str = _get_tmp_str(options)
+    options, heur = _get_heur(options)
+    options, conv = _get_conv(options)
+    outcmd = _get_outcmd(output_dir)
+
+    # for options that simply append another flag
+    options_dict = {
+        "overwrite": '--overwrite',
+        "debug": '--dbg',
+        "minmeta": '--minmeta'
     }
-    default_for_kwargs.update(kwargs)
-    print(default_for_kwargs)
-    return default_for_kwargs
+    other_flags = _get_other_cmds(options, options_dict)
 
-    if not heuristics_script:
-        # use heuristics script inside container
-        heuristics_script = '/src/heudiconv/heuristics/convertall.py'
-    else:
-        heuristics_script = Path(
-            '/data').joinpath(heuristics_script).as_posix()
-    if host_is_hpc():
-        cmd = 'module load singularity;'
-    else:
-        cmd = ''
+    cmd = \
+        f"""\
+{setup}singularity exec{pbind}{dev_str}{tmp_str}{img}\
+ bash -c 'source activate neuro; /neurodocker/startup.sh;\
+ heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
+{heur}{conv}{outcmd} -b{other_flags}'\
+"""
 
-    project_dir = Path(project_dir).as_posix()
     output_dir = Path(output_dir).as_posix()
-#     cmd = cmd + \
-#     'module load Anaconda;source deactivate;' +\
-    cmd += \
-        ' singularity exec' + \
-        ' --bind ' + project_dir + ':/data'
-
-    if dev:
-        if host_is_hpc():
-            cmd += ' --bind /home/rodgersleejg/Documents/code/heudiconv_project/heudiconv/heudiconv:/opt/conda/envs/neuro/lib/python2.7/site-packages/heudiconv'
-        else:
-            assert False
-
-    if use_scratch:
-        cmd += ' --bind /lscratch/$SLURM_JOB_ID:/tmp'
-    else:
-        print('Not using scratch.')
-        cmd += ' --bind /tmp:/tmp'
-
-    cmd += ' ' + container_image.as_posix() + \
-        " bash -c 'source activate neuro; /neurodocker/startup.sh heudiconv" + \
-        ' -d ' + row.dicom_template + \
-        ' -s ' + row.bids_subj + \
-        ' -ss ' + row.bids_ses + \
-        ' -f ' + heuristics_script + \
-        ' -b'
-
-    if overwrite:
-        cmd += ' --overwrite'
-    if output_dir is not None:
-        output_dir = Path(output_dir).as_posix()
-        cmd += ' -o ' + output_dir
-
-    if conv_dir is not None:
-        conv_dir = Path(conv_dir).as_posix()
-        cmd += ' --conv-outdir ' + conv_dir
-
-    if debug:
-        cmd += ' --dbg'
-
-    if minmeta:
-        cmd += ' --minmeta'
-
-    if conversion:
-        cmd += ' -c dcm2niix'
-    else:
-
-        cmd += ' -c none'
-    cmd += "'"
     return cmd
-
-
-def _assemble_cmd_list(cmd_list, kwargs, kwarg_dict):
-
-    return cmd_list
-
-
-def test_assemble_cmd_list():
-    return True
-    assert _assemble_cmd_list(cmd_list,)
