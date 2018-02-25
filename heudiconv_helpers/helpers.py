@@ -210,7 +210,7 @@ values_to_set=None):
     return row
 
 
-def host_is_hpc(sim=False,host_simulated="helix.nih.gov"):
+def host_is_hpc(sim=False, host_simulated="helix.nih.gov"):
     if sim:
         host = host_simulated
     else:
@@ -218,29 +218,103 @@ def host_is_hpc(sim=False,host_simulated="helix.nih.gov"):
             host = platform.node()
         except:
             host = ""
-    if any(h in host for h in ['biowulf','helix','felix']):
+    if any(h in host for h in ['biowulf', 'helix', 'felix']):
         hpc = True
     else:
         hpc = False
-
 
     return hpc
 
 
 def test_host_is_hpc():
     assert host_is_hpc(sim=True) == True
-    assert host_is_hpc(sim=True,host_simulated = "a_host_name") == False
+    assert host_is_hpc(sim=True, host_simulated="a_host_name") == False
 
 
-def make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=None,conv_dir=None,\
-                                 anon_script=None,conversion=False,minmeta=False, \
-                        overwrite=True,debug=False,dev=False,use_scratch=False):
+def test_heud_call():
+    row = pd.Series({'dicom_template': "the_template",
+                     "bids_subj": "the_subj", "bids_ses": "the_sess"})
+    # make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=None,conv_dir=None,\
+    #                              anon_script=None,conversion=False,minmeta=False, \
+    #                     overwrite=True,debug=False,dev=False,use_scratch=False):
+
+    cmds = make_heud_call(row=row,
+                         project_dir=Path.cwd(),
+                         output_dir=Path.cwd(),
+                         container_image=Path('sing_path'),
+                         conversion=False, minmeta=False,
+                         overwrite=True,
+                         debug=False,
+                         dev=False,
+                         use_scratch=False)
+    assert False
+
+
+
+def make_heud_call(*, row=None, project_dir=None, output_dir=None,
+                   container_image=None, **kwargs):
+    """
+    Returns command for executing heudiconv in a container.
+
+    Parameters
+    ----------
+    row: pd.Series
+        Dataframe row containing a column that has a path to a json.
+    project_dir: pathlib.Path,string
+        Should be the base directory (absolute path) of all projects work.
+    output_dir: pathlib.Path,string
+       Path to output directory relative to the project_dir.
+    container_image: pathlib.Path,string
+        Path to heudiconv singularity image.
+    heuristics_script: None,
+    conv_dir: None,
+    anon_script: None,
+    conversion: bool, default False
+        Use dcm2niix to convert the dicoms.
+    minmeta: bool, default False
+        Remove the majority of the metadata.
+    overwrite: bool, default True
+        Overwrite previous output
+    debug: bool, default False
+        Drop into pdb upon error.
+    dev: bool, default False
+        Mount heudiconv code repo to container.
+    use_scratch: bool, default False
+        Mount /lscratch/$SLURM_JOB_ID to containers tmp directory.
+
+     Returns
+    -------
+    row: for get the returned row will be modified
+
+    Example usage:
+    df.apply(lambda row: modify_json_fields(row,
+                         fieldnames = ['SliceTiming',('primary_field','AcquisitionTime')],
+                         action = 'set',
+                         values_to_set = [[0,0.2,0.4,0.6],"15.20.00"])
+    """
+
+
+    default_for_kwargs = {
+        "heuristics_script": None,
+        "conv_dir": None,
+        "anon_script": None,
+        "conversion": False,
+        "minmeta": False,
+        "overwrite": True,
+        "debug": False,
+        "dev": False,
+        "use_scratch": False
+    }
+    default_for_kwargs.update(kwargs)
+    print(default_for_kwargs)
+    return default_for_kwargs
 
     if not heuristics_script:
         # use heuristics script inside container
         heuristics_script = '/src/heudiconv/heuristics/convertall.py'
     else:
-        heuristics_script = Path('/data').joinpath(heuristics_script).as_posix()
+        heuristics_script = Path(
+            '/data').joinpath(heuristics_script).as_posix()
     if host_is_hpc():
         cmd = 'module load singularity;'
     else:
@@ -251,8 +325,8 @@ def make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=
 #     cmd = cmd + \
 #     'module load Anaconda;source deactivate;' +\
     cmd += \
-    ' singularity exec' + \
-    ' --bind ' + project_dir + ':/data'
+        ' singularity exec' + \
+        ' --bind ' + project_dir + ':/data'
 
     if dev:
         if host_is_hpc():
@@ -267,12 +341,12 @@ def make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=
         cmd += ' --bind /tmp:/tmp'
 
     cmd += ' ' + container_image.as_posix() + \
-    " bash -c 'source activate neuro; /neurodocker/startup.sh heudiconv" + \
-    ' -d ' + row.dicom_template + \
-    ' -s ' + row.bids_subj + \
-    ' -ss ' + row.bids_ses + \
-    ' -f ' + heuristics_script + \
-    ' -b'
+        " bash -c 'source activate neuro; /neurodocker/startup.sh heudiconv" + \
+        ' -d ' + row.dicom_template + \
+        ' -s ' + row.bids_subj + \
+        ' -ss ' + row.bids_ses + \
+        ' -f ' + heuristics_script + \
+        ' -b'
 
     if overwrite:
         cmd += ' --overwrite'
@@ -299,14 +373,11 @@ def make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=
     return cmd
 
 
-def test_heud_call():
-    row = pd.Series({'dicom_template':"the_template","bids_subj":"the_subj","bids_ses":"the_sess"})
-    # make_heud_call(row,project_dir,output_dir,container_image,heuristics_script=None,conv_dir=None,\
-    #                              anon_script=None,conversion=False,minmeta=False, \
-    #                     overwrite=True,debug=False,dev=False,use_scratch=False):
+def _assemble_cmd_list(cmd_list, kwargs, kwarg_dict):
 
-    print(make_heud_call(row,Path.cwd(),Path.cwd(),Path('sing_path'),\
-            conversion=False,minmeta=False,\
-                            overwrite=True,debug=False,dev=False,use_scratch=False) )
+    return cmd_list
 
 
+def test_assemble_cmd_list():
+    return True
+    assert _assemble_cmd_list(cmd_list,)
