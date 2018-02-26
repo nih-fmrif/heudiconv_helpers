@@ -4,13 +4,11 @@ import pytest
 from pandas.util.testing import assert_series_equal
 from pathlib import Path
 
-from heudiconv_helpers import gen_slice_timings
+from heudiconv_helpers import gen_slice_timings, make_heud_call, host_is_hpc
 from heudiconv_helpers.helpers import _set_fields
 from heudiconv_helpers.helpers import _get_fields
 from heudiconv_helpers.helpers import _del_fields
-from heudiconv_helpers.helpers import make_heud_call
 from heudiconv_helpers.helpers import _get_outcmd
-from heudiconv_helpers.helpers import host_is_hpc
 
 
 def test_gen_slice_timings():
