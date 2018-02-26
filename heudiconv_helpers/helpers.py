@@ -233,7 +233,7 @@ def _get_dev_str(options):
         dev_dir = options.pop('dev_dir')
         heud_path = \
             '/opt/conda/envs/neuro/lib/python2.7/site-packages/heudiconv'
-        dev_str = ' --bind %s/heudiconv:%s' % dev_dir, heud_path
+        dev_str = ' --bind %s/heudiconv:%s' % (dev_dir, heud_path)
     else:
         dev_str = ""
         if options.pop('dev_dir'):

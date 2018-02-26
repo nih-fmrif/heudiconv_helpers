@@ -140,3 +140,17 @@ def test_heud_call():
                          dev=False,
                          use_scratch=False)
 
+def test_heud_dev_call():
+    row = pd.Series({'dicom_template': "the_template",
+                     "bids_subj": "the_subj", "bids_ses": "the_sess"})
+    cmd = make_heud_call(row=row,
+                         project_dir="proj",
+                         output_dir=Path.cwd(),
+                         container_image=Path('sing_path'),
+                         conversion=False, minmeta=False,
+                         overwrite=True,
+                         debug=True,
+                         dev=True,
+                         dev_dir="path_to_heudiconv",
+                         use_scratch=False)
+
