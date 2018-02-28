@@ -5,13 +5,11 @@ from pandas.util.testing import assert_series_equal
 from pathlib import Path
 import json
 
-from heudiconv_helpers import gen_slice_timings
+from heudiconv_helpers import gen_slice_timings, make_heud_call, host_is_hpc
 from heudiconv_helpers.helpers import _set_fields
 from heudiconv_helpers.helpers import _get_fields
 from heudiconv_helpers.helpers import _del_fields
-from heudiconv_helpers.helpers import make_heud_call
 from heudiconv_helpers.helpers import _get_outcmd
-from heudiconv_helpers.helpers import host_is_hpc
 
 
 def test_gen_slice_timings():
@@ -150,5 +148,19 @@ def test_heud_call():
                          overwrite=True,
                          debug=False,
                          dev=False,
+                         use_scratch=False)
+
+def test_heud_dev_call():
+    row = pd.Series({'dicom_template': "the_template",
+                     "bids_subj": "the_subj", "bids_ses": "the_sess"})
+    cmd = make_heud_call(row=row,
+                         project_dir="proj",
+                         output_dir=Path.cwd(),
+                         container_image=Path('sing_path'),
+                         conversion=False, minmeta=False,
+                         overwrite=True,
+                         debug=True,
+                         dev=True,
+                         dev_dir="path_to_heudiconv",
                          use_scratch=False)
 
