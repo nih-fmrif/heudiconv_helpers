@@ -1,5 +1,8 @@
-from .helpers import gen_slice_timings, json_action, host_is_hpc, make_heud_call, coerce_to_int
+funcs = [gen_slice_timings, json_action, host_is_hpc, make_heud_call,\
+    coerce_to_int, get_symlink_name, test_get_symlink_name, make_symlink, make_symlink_template]
 
-__all__ = ["gen_slice_timings","json_action","host_is_hpc","make_heud_call","coerce_to_int"]
+from .helpers import *funcs
+
+__all__ = [*funcs]
 __version__ = "0.0.3"
 print(__version__)

@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import json
 import platform
+import os
 
 
 def coerce_to_int(num, name):
@@ -113,7 +114,7 @@ def _get_fields(row, data, fieldnames):
 
 
 def _set_fields(data, fieldnames, values_to_set):
-    if not isinstance(values_to_set,list):
+    if not isinstance(values_to_set, list):
         raise ValueError('values_to_set" argument must be a list')
     for f_idx, field in enumerate(fieldnames):
         tmp = data
@@ -198,7 +199,6 @@ def json_action(row, json_col='json_path', fieldnames=None,
     assert action in ['delete', 'get', 'set']
     # for working with jsons see:
     # https://www.safaribooksonline.com/library/view/python-cookbook-3rd/9781449357337/ch06s02.html
-    
 
     json_path = Path(row[json_col])
     with json_path.open() as j:
@@ -220,10 +220,7 @@ def host_is_hpc(sim=False, host_simulated="helix.nih.gov"):
     if sim:
         host = host_simulated
     else:
-        try:
             host = platform.node()
-        except:
-            host = ""
     if any(h in host for h in ['biowulf', 'helix', 'felix']):
         hpc = True
     else:
@@ -349,7 +346,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
                      container_image = sing_image))
           )
     """
-    if not isinstance(row,pd.Series):
+    if not isinstance(row, pd.Series):
         raise ValueError("row needs to be a pandas series object")
     options = OrderedDict({
         "heuristics_script": None,
@@ -390,3 +387,60 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
 
     output_dir = Path(output_dir).as_posix()
     return cmd
+
+
+def get_symlink_name(row, symlinked_dicoms, sub_col='bids_subj',
+                     ses_col='bids_ses', path_col='dicom_path'):
+    symlink = \
+        row[sub_col] + \
+        '-' + row[ses_col] + \
+        ''.join(Path(row[path_col]).suffixes)
+    return symlink
+
+
+def test_get_symlink_name():
+    get_symlink_name
+
+
+def make_symlink(row, overwrite_previous=False):
+    """
+    Dicoms are symlinked for running heudiconv v-0.2
+    which has a slightly different interface and
+    dictates that the files be named in a particular
+    way
+    """
+    original_dir = Path.cwd()
+    stdout = os.chdir(row.symlink_path.parent)
+    if row.symlink_path.exists() and not overwrite_previous:
+        symlinked = False
+        print('Symlink exists already, supply "overwrite_previous" argument\
+         if you wish to overwrite it')
+    else:
+        if row.symlink_path.exists():
+            os.remove(row.symlink_path)
+        stdout = row.symlink_path.symlink_to(
+            Path('..').joinpath(row.dicom_path))
+        symlinked = True
+    stdout = os.chdir(original_dir)
+    return symlinked
+
+
+def make_symlink_template(row, project_dir_absolute):
+    """
+    Symlink template is required for heudiconv v-0.2
+    which has a slightly different interface where
+    the template must contain subject and session in
+    braces
+    """
+
+    sym_dir_container = \
+        Path('/data').joinpath(
+            row.symlink_path.parent.relative_to(project_dir_absolute)
+        )
+
+    template = \
+        sym_dir_container.as_posix() + \
+        '/{subject}-{session}' + \
+        '*' + \
+        ''.join(Path(row.dicom_path).suffixes)
+    return template
