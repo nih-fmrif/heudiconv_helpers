@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from pandas.util.testing import assert_series_equal
 from pathlib import Path
+import json
 
 from heudiconv_helpers import gen_slice_timings
 from heudiconv_helpers.helpers import _set_fields
@@ -31,19 +32,22 @@ def test_gen_slice_timings():
     with pytest.raises(ValueError):
     	gen_slice_timings(1.9, 5.1, 1.0, 'seqminus') == [0.8, 0.6, 0.4, 0.2, 0.0]
 
+def get_data_object():
+    return json.loads(json.dumps({'a': {'b': {'c': 20}}, 'd': 30}))
+
 
 def test_del_fields():
-    foo = {'a': {'b': {'c': 20}}, 'd': 30}
+    foo = get_data_object()
     fieldnames = [('a', 'b', 'c')]
     _del_fields(foo, fieldnames)
     assert foo == {'a': {'b': {}}, 'd': 30}
 
-    foo = {'a': {'b': {'c': 20}}, 'd': 30}
+    foo = get_data_object()
     fieldnames = [('a', 'b', 'c'), 'd']
     _del_fields(foo, fieldnames)
     assert foo == {'a': {'b': {}}}
 
-    foo = {'a': {'b': {'c': 20}}, 'd': 30}
+    foo = get_data_object()
     fieldnames = ['d']
     _del_fields(foo, fieldnames)
     assert foo == {'a': {'b': {'c': 20}}}
@@ -53,7 +57,7 @@ def test_del_fields():
     _del_fields(foo, fieldnames)
     assert foo == {'a': {'b': {'c': 20}}}
 
-    foo = {'a': {'b': {'c': 20}}, 'd': 30}
+    foo = get_data_object()
     fieldnames = [('a', 'd')]
     # some times fields are missing, this can be ignored
     _del_fields(foo, fieldnames)
@@ -61,30 +65,36 @@ def test_del_fields():
 
 
 def test_set_fields():
-    data = {'a': {'b': {'c': 20}}, 'd': 30}
+    data = get_data_object()
     fieldnames = [('d')]
     data = _set_fields(data, fieldnames, [20])
     assert data == {'a': {'b': {'c': 20}}, 'd': 20}
 
-    data = {'a': {'b': {'c': 20}}, 'd': 30}
+    data = get_data_object()
     fieldnames = ['d']
     data = _set_fields(data, fieldnames, [20])
     assert data == {'a': {'b': {'c': 20}}, 'd': 20}
 
-    data = {'a': {'b': {'c': 20}}, 'd': 30}
+    data = get_data_object()
     fieldnames = [('a', 'b', 'c')]
     data = _set_fields(data, fieldnames, [50])
     assert data == {'a': {'b': {'c': 50}}, 'd': 30}
 
-    data = {'a': {'b': {'c': 20}}, 'd': 30}
+    data = get_data_object()
     fieldnames = [('a', 'b', 'c'), 'd']
     data = _set_fields(data, fieldnames, [50, 'hello'])
     assert data == {'a': {'b': {'c': 50}}, 'd': 'hello'}
 
+    data = get_data_object()
+    fieldnames = [('a', 'b', 'c'), 'd']
+    with pytest.raises(ValueError):
+        data = _set_fields(data, fieldnames, 'hello')
+    
+
 
 def test_get_fields():
     row = pd.Series({'path': 'a/path'})
-    data = {'a': {'b': {'c': 20}}, 'd': 30}
+    data = get_data_object()
 
     fieldnames = ['d']
     row = _get_fields(row, data, fieldnames)
@@ -98,7 +108,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'a_b_c': 20}).
+                                  'a__b__c': 20}).
                         sort_index())
 
     row = pd.Series({'path': 'a/path'})
@@ -106,7 +116,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'a_b_c': 20,
+                                  'a__b__c': 20,
                                    'd': 30}).
                         sort_index())
 
@@ -115,7 +125,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'a_b_d': np.nan,
+                                  'a__b__d': np.nan,
                                    'e': np.nan}).
                         sort_index())
 

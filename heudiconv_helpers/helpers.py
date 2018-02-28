@@ -97,12 +97,12 @@ def _get_fields(row, data, fieldnames):
                     if ii == (len(field) - 1):
                         # tmp[key] = values_to_set[f_idx]
                         row = row.append(
-                            pd.Series({'_'.join(field): tmp[key]}))
+                            pd.Series({'__'.join(field): tmp[key]}))
                     else:
                         tmp[key]
                         tmp = tmp[key]
                 except KeyError:
-                    row = row.append(pd.Series({'_'.join(field): np.nan}))
+                    row = row.append(pd.Series({'__'.join(field): np.nan}))
         else:
             try:
                 row = row.append(pd.Series({field: data[field]}))
@@ -113,7 +113,8 @@ def _get_fields(row, data, fieldnames):
 
 
 def _set_fields(data, fieldnames, values_to_set):
-
+    if not isinstance(values_to_set,list):
+        raise ValueError('values_to_set" argument must be a list')
     for f_idx, field in enumerate(fieldnames):
         tmp = data
         if isinstance(field, tuple):
@@ -195,6 +196,9 @@ def json_action(row, json_col='json_path', fieldnames=None,
     """
     assert fieldnames is not None
     assert action in ['delete', 'get', 'set']
+    # for working with jsons see:
+    # https://www.safaribooksonline.com/library/view/python-cookbook-3rd/9781449357337/ch06s02.html
+    
 
     json_path = Path(row[json_col])
     with json_path.open() as j:
