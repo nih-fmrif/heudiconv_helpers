@@ -138,17 +138,22 @@ def test_get_outcmd():
 
 
 def test_heud_call():
-    row = pd.Series({'dicom_template': "the_template",
-                     "bids_subj": "the_subj", "bids_ses": "the_sess"})
-    cmd = make_heud_call(row=row,
-                         project_dir="proj",
-                         output_dir=Path.cwd(),
-                         container_image=Path('sing_path'),
-                         conversion=False, minmeta=False,
-                         overwrite=True,
-                         debug=False,
-                         dev=False,
-                         use_scratch=False)
+    row = pd.DataFrame({'dicom_template': "the_template",
+                 "bids_subj": "the_subj", "bids_ses": "the_sess"},index = [0] )
+    basic_kwargs = {
+    "project_dir":"proj",
+    "output_dir":"outdir",
+    "container_image":"img_path"}
+    # Should work with a series
+    cmd = make_heud_call(row=row.iloc[0,:],
+                         **basic_kwargs)
+    # Should work with
+    with pytest.raises(ValueError):
+        cmd = make_heud_call(row=row.iloc[:0,:],
+                         **basic_kwargs)
+
+    print(cmd)
+
 
 def test_heud_dev_call():
     row = pd.Series({'dicom_template': "the_template",
@@ -163,4 +168,5 @@ def test_heud_dev_call():
                          dev=True,
                          dev_dir="path_to_heudiconv",
                          use_scratch=False)
+
 

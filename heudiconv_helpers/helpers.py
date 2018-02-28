@@ -249,8 +249,10 @@ def _get_tmp_str(options):
     if options.pop('use_scratch'):
         tmp_str = ' --bind /lscratch/$SLURM_JOB_ID:/tmp'
     else:
-        print('Not using scratch.')
         tmp_str = ' --bind /tmp:/tmp'
+        if host_is_hpc():
+            print('Not using scratch.')
+
     return tmp_str, options
 
 
@@ -347,6 +349,8 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
                      container_image = sing_image))
           )
     """
+    if not isinstance(row,pd.Series):
+        raise ValueError("row needs to be a pandas series object")
     options = OrderedDict({
         "heuristics_script": None,
         "anon_script": None,
