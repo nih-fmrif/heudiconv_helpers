@@ -4,6 +4,18 @@ import os
 from collections import namedtuple
 
 
+def filter_dicom(dcmdata):
+    """Return True if a DICOM dataset should be filtered out, else False"""
+    comments = getattr(dcmdata, 'ImageComments', '')
+    if len(comments):
+        if 'reference volume' in comments.lower():
+            print("Filter out image with comment '%s'" % comments)
+            return True
+    return False
+    # Another format:return True if dcmdata.StudyInstanceUID in dicoms2skip else False
+
+
+
 def filter_files(fn):
     """
     This is used by heudiconv to filter files based on the filename.
