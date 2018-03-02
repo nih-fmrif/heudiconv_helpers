@@ -19,7 +19,7 @@ def create_key(template, outtype=('nii.gz'), annotation_classes=None):
     return template, outtype, annotation_classes
 
 
-def infotodict(seqinfo):
+def infotodict(seqinfo,test_heuristics=False):
 
     t1w = create_key(
         'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-fspgr_run-{item:03d}_T1w')
@@ -59,45 +59,41 @@ def infotodict(seqinfo):
     info = {t1w: [], pcasl: [], dti_ap: [], dti_pa: [], dti: [], flair_2d: [], t2_star: [],
             rest: [], cube_t2: [], hippo: [], flair_3d: [], avdc: [], cbf: [], fa: [], trace: [],
             resting_fmap: [], dti_fmap: []}
+    heurs = {
+     "('Axial DTI B=1000' == s.series_description)":  "info[dti_pa].append([s.series_id])",
+     "('Axial DTI 24vols flipped' == s.series_description)":   "info[dti_ap].append([s.series_id])",
+     "('DTI' in s.series_description)":   "info[dti].append([s.series_id])",
 
+     "('FSPGR' in s.series_description.upper())":   "info[t1w].append([s.series_id])",
+     "('pCASL' == s.series_description)":   "info[pcasl].append([s.series_id])",
+     "('ResHippo' in s.series_description)":   "info[hippo].append([s.series_id])",
+     "('T2 2D' in s.series_description)":   "info[flair_2d].append([s.series_id])",
+     "('T2 Star' in s.series_description)":   "info[t2_star].append([s.series_id])",
+     "('CUBE_T2' in s.series_description)":   "info[cube_t2].append([s.series_id])",
+     "('3D FLAIR' in s.series_description)":   "info[flair_3d].append([s.series_id])",
+
+     "('Axial rsfMRI' in s.series_description)":   "info[rest].append([s.series_id])",
+
+     "('AvDC' in s.series_description)":   "info[avdc].append([s.series_id])",
+     "('CBF' in s.series_description)":   "info[cbf].append([s.series_id])",
+     "('FA' in s.series_description)":   "info[fa].append([s.series_id])",
+     "('Trace' in s.series_description)":   "info[trace].append([s.series_id])",
+
+     "('B0 Map - DTI' == s.series_description)":   "info[dti_fmap]",
+     "('B0 Map - rsfMRI' == s.series_description)":   "info[resting_fmap]",
+    }
+
+    if test_heuristics:
+        for s in seqinfo:
+            for criterion,action in heurs.items():
+                eval(criterion)
+                eval(action)
+            print("The defined heuristics evaluate")
+            return True
     for s in seqinfo:
-        if ('Axial DTI B=1000' == s.series_description):
-            info[dti_pa].append([s.series_id])
-        elif ('Axial DTI 24vols flipped' == s.series_description):
-            info[dti_ap].append([s.series_id])
-        elif ('DTI' in s.series_description):
-            info[dti].append([s.series_id])
-
-        if ('FSPGR' in s.series_description.upper()):
-            info[t1w].append([s.series_id])
-        elif ('pCASL' == s.series_description):
-            info[pcasl].append([s.series_id])
-        elif ('ResHippo' in s.series_description):
-            info[hippo].append([s.series_id])
-        elif ('T2 2D' in s.series_description):
-            info[flair_2d].append([s.series_id])
-        elif ('T2 Star' in s.series_description):
-            info[t2_star].append([s.series_id])
-        elif ('CUBE_T2' in s.series_description):
-            info[cube_t2].append([s.series_id])
-        elif ('3D FLAIR' in s.series_description):
-            info[flair_3d].append([s.series_id])
-
-        elif ('Axial rsfMRI' in s.series_description):
-            info[rest].append([s.series_id])
-
-        elif ('AvDC' in s.series_description):
-            info[avdc].append([s.series_id])
-        elif ('CBF' in s.series_description):
-            info[cbf].append([s.series_id])
-        elif ('FA' in s.series_description):
-            info[fa].append([s.series_id])
-        elif ('Trace' in s.series_description):
-            info[trace].append([s.series_id])
-
-        elif ('B0 Map - DTI' == s.series_description):
-            info['dti_fmap']
-        elif ('B0 Map - rsfMRI' == s.series_description):
-            info['resting_fmap']
+        for criterion,action in heurs.items():
+            if eval(criterion):
+                eval(action)
+                break
 
     return info

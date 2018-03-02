@@ -5,12 +5,16 @@ import pandas as pd
 import json
 import platform
 import os
+import os.path as op
 from heudiconv.utils import load_heuristic
 from collections import namedtuple
 from heudiconv_helpers import helpers as hh
-
+import sys
 import shutil
 import subprocess
+from importlib import reload
+__version__ = "helpers:0.0.4"
+print(__version__)
 
 
 def coerce_to_int(num, name):
@@ -472,8 +476,7 @@ def __get_seqinfo():
     return seqinfo
 
 
-def validate_heuristics_output(heuristics_script=None):
-    from subprocess import check_output, STDOUT
+def validate_heuristics_output(heuristics_script=None,seqinfo=None):
     if heuristics_script is None:
         from heudiconv_helpers.sample_heuristics import infotodict, filter_files, create_key
     else:
@@ -485,8 +488,8 @@ def validate_heuristics_output(heuristics_script=None):
 
     thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
     test_dir = Path('bids_test/')
-
-    seqinfo = __get_seqinfo()
+    if not seqinfo:
+        seqinfo = __get_seqinfo()
     templates_extracted = infotodict(seqinfo)
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
@@ -511,3 +514,31 @@ def validate_heuristics_output(heuristics_script=None):
         if test_dir.exists():
             shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
         return validation.stdout.decode('utf-8')
+
+
+def check_heuristic_script_integrity(heuristics_script=None,test_heuristics=False):
+    if heuristics_script is None:
+        from heudiconv_helpers.sample_heuristics import infotodict, filter_files, create_key
+    else:
+        heuristics_script = Path(heuristics_script.absolute()).as_posix()
+        heuristics = hh_load_heuristic(heuristics_script)
+        infotodict = heuristics.infotodict
+    seqinfo = __get_seqinfo()
+    infotodict(seqinfo,test_heuristics=test_heuristics)
+
+
+def hh_load_heuristic(heu_path):
+    """Load heuristic from the file, return the module
+    """
+    heu_full_path = Path(heu_path).absolute().as_posix()
+    path, fname = op.split(heu_full_path)
+    try:
+        old_syspath = sys.path[:]
+        sys.path.append(path)
+        mod = __import__(fname.split('.')[0])
+        reload(mod)
+        mod.filename = heu_full_path
+    finally:
+        sys.path = old_syspath
+
+    return mod
