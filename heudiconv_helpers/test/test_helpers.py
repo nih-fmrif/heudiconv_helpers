@@ -5,7 +5,8 @@ from pandas.util.testing import assert_series_equal
 from pathlib import Path
 import json
 
-from heudiconv_helpers import gen_slice_timings, make_heud_call, host_is_hpc
+from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
+                                       host_is_hpc, validate_heuristics_output)
 from heudiconv_helpers.helpers import _set_fields
 from heudiconv_helpers.helpers import _get_fields
 from heudiconv_helpers.helpers import _del_fields
@@ -26,9 +27,12 @@ def test_gen_slice_timings():
     assert np.isnan(gen_slice_timings(np.nan, 5, 1, 'seqminus'))
     assert np.isnan(gen_slice_timings(1, np.nan, 1, 'seqminus'))
     # turns float arguments to int if they are rounded
-    assert gen_slice_timings(1.0, 5.0, 1.0, 'seqminus') == [0.8, 0.6, 0.4, 0.2, 0.0]
+    assert gen_slice_timings(1.0, 5.0, 1.0, 'seqminus') == [
+        0.8, 0.6, 0.4, 0.2, 0.0]
     with pytest.raises(ValueError):
-    	gen_slice_timings(1.9, 5.1, 1.0, 'seqminus') == [0.8, 0.6, 0.4, 0.2, 0.0]
+        gen_slice_timings(1.9, 5.1, 1.0, 'seqminus') == [
+            0.8, 0.6, 0.4, 0.2, 0.0]
+
 
 def get_data_object():
     return json.loads(json.dumps({'a': {'b': {'c': 20}}, 'd': 30}))
@@ -87,7 +91,6 @@ def test_set_fields():
     fieldnames = [('a', 'b', 'c'), 'd']
     with pytest.raises(ValueError):
         data = _set_fields(data, fieldnames, 'hello')
-    
 
 
 def test_get_fields():
@@ -98,7 +101,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'd': 30}).
+                                   'd': 30}).
                         sort_index())
 
     row = pd.Series({'path': 'a/path'})
@@ -106,7 +109,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'a__b__c': 20}).
+                                   'a__b__c': 20}).
                         sort_index())
 
     row = pd.Series({'path': 'a/path'})
@@ -114,7 +117,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'a__b__c': 20,
+                                   'a__b__c': 20,
                                    'd': 30}).
                         sort_index())
 
@@ -123,7 +126,7 @@ def test_get_fields():
     row = _get_fields(row, data, fieldnames)
     assert_series_equal(row.sort_index(),
                         pd.Series({'path': 'a/path',
-                                  'a__b__d': np.nan,
+                                   'a__b__d': np.nan,
                                    'e': np.nan}).
                         sort_index())
 
@@ -139,18 +142,19 @@ def test_get_outcmd():
 
 def test_heud_call():
     row = pd.DataFrame({'dicom_template': "the_template",
-                 "bids_subj": "the_subj", "bids_ses": "the_sess"},index = [0] )
+                        "bids_subj": "the_subj",
+                        "bids_ses": "the_sess"}, index=[0])
     basic_kwargs = {
-    "project_dir":"proj",
-    "output_dir":"outdir",
-    "container_image":"img_path"}
+        "project_dir": "proj",
+        "output_dir": "outdir",
+        "container_image": "img_path"}
     # Should work with a series
-    cmd = make_heud_call(row=row.iloc[0,:],
+    cmd = make_heud_call(row=row.iloc[0, :],
                          **basic_kwargs)
     # Should work with
     with pytest.raises(ValueError):
-        cmd = make_heud_call(row=row.iloc[:0,:],
-                         **basic_kwargs)
+        cmd = make_heud_call(row=row.iloc[:0, :],
+                             **basic_kwargs)
 
     print(cmd)
 
@@ -170,3 +174,12 @@ def test_heud_dev_call():
                          use_scratch=False)
 
 
+def test_validate_heuristics_output():
+    from heudiconv_helpers import helpers as hh
+    heuristics_script = Path(hh.__file__).with_name(
+        'sample_heuristics.py')
+    validate_heuristics_output(heuristics_script=heuristics_script)
+
+
+def test_validate_heuristics_output_no_arg():
+    validate_heuristics_output()

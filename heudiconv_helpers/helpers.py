@@ -5,6 +5,12 @@ import pandas as pd
 import json
 import platform
 import os
+from heudiconv.utils import load_heuristic
+from collections import namedtuple
+from heudiconv_helpers import helpers as hh
+
+import shutil
+import subprocess
 
 
 def coerce_to_int(num, name):
@@ -220,7 +226,7 @@ def host_is_hpc(sim=False, host_simulated="helix.nih.gov"):
     if sim:
         host = host_simulated
     else:
-            host = platform.node()
+        host = platform.node()
     if any(h in host for h in ['biowulf', 'helix', 'felix']):
         hpc = True
     else:
@@ -444,3 +450,64 @@ def make_symlink_template(row, project_dir_absolute):
         '*' + \
         ''.join(Path(row.dicom_path).suffixes)
     return template
+
+
+def __get_seqinfo():
+
+    key_list = ['total_files_till_now', 'example_dcm_file', 'series_id',
+                'dcm_dir_name', 'unspecified2', 'unspecified3', 'dim1', 'dim2',
+                'dim3', 'dim4', 'TR', 'TE', 'protocol_name',
+                'is_motion_corrected', 'is_derived', 'patient_id',
+                'study_description', 'referring_physician_name',
+                'series_description', 'sequence_name', 'image_type',
+                'accession_number', 'patient_age', 'patient_sex']
+
+    seqinfo_dict = {k: np.nan for k in key_list}
+    seqinfo_dict['series_id'] = 'id_for_dti'
+    seqinfo_dict['series_description'] = 'a DTI series description'
+    seqinfo_dict['dim1'] = 10
+    seqinfo_element = namedtuple('seqinfo_class', seqinfo_dict.keys())
+    seqinfo = [seqinfo_element(**seqinfo_dict),
+               seqinfo_element(**seqinfo_dict)]
+    return seqinfo
+
+
+def validate_heuristics_output(heuristics_script=None):
+    from subprocess import check_output, STDOUT
+    if heuristics_script is None:
+        from heudiconv_helpers.sample_heuristics import infotodict, filter_files, create_key
+    else:
+        heuristics_script = Path(heuristics_script).as_posix()
+        heuristic = load_heuristic(heuristics_script)
+        infotodict = heuristic.infotodict
+        filter_files = heuristic.filter_files
+        create_key = heuristic.create_key
+
+    thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
+    test_dir = Path('bids_test/')
+
+    seqinfo = __get_seqinfo()
+    templates_extracted = infotodict(seqinfo)
+    if test_dir.exists():
+        shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+
+    for subject in ['0001']:
+        session = 'ses-0001'
+        item = 1
+        for template, _, _ in templates_extracted.keys():
+            if template.find('derivatives') > -1:
+                pass
+            else:
+                file = test_dir.joinpath(template.format(**locals()))
+                os.makedirs('/'.join(file.parts[:-1]), exist_ok=True)
+                file.with_suffix('.nii.gz').symlink_to(thenifti.absolute())
+
+        validation = subprocess.run(
+            'docker run --rm -v $PWD/bids_test:/data:ro\
+             bids/validator:0.25.9 /data',
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        if test_dir.exists():
+            shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+        return validation.stdout.decode('utf-8')
