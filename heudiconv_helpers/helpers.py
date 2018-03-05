@@ -456,8 +456,7 @@ def make_symlink_template(row, project_dir_absolute):
     return template
 
 
-def __get_seqinfo():
-
+def __get_seqinfo_dict():
     key_list = ['total_files_till_now', 'example_dcm_file', 'series_id',
                 'dcm_dir_name', 'unspecified2', 'unspecified3', 'dim1', 'dim2',
                 'dim3', 'dim4', 'TR', 'TE', 'protocol_name',
@@ -470,29 +469,31 @@ def __get_seqinfo():
     seqinfo_dict['series_id'] = 'id_for_dti'
     seqinfo_dict['series_description'] = 'a DTI series description'
     seqinfo_dict['dim1'] = 10
+    return seqinfo_dict
+
+
+def __get_seqinfo():
+    seqinfo_dict = __get_seqinfo_dict()
     seqinfo_element = namedtuple('seqinfo_class', seqinfo_dict.keys())
     seqinfo = [seqinfo_element(**seqinfo_dict),
                seqinfo_element(**seqinfo_dict)]
     return seqinfo
 
 
-def validate_heuristics_output(heuristics_script=None,seqinfo=None):
-    if heuristics_script is None:
-        from heudiconv_helpers.sample_heuristics import infotodict, filter_files, create_key
-    else:
-        heuristics_script = Path(heuristics_script).as_posix()
-        heuristic = load_heuristic(heuristics_script)
-        infotodict = heuristic.infotodict
-        filter_files = heuristic.filter_files
-        create_key = heuristic.create_key
-
-    thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
+def validate_heuristics_output(heuristics_script=None):
     test_dir = Path('bids_test/')
-    if not seqinfo:
-        seqinfo = __get_seqinfo()
-    templates_extracted = infotodict(seqinfo)
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+    if not shutil.which('docker'):
+        raise EnvironmentError("Cannot find docker on path")
+    if heuristics_script is None:
+        import heudiconv_helpers.sample_heuristics as heur
+    else:
+        heur = load_heuristic(Path(heuristics_script).as_posix())
+
+    seqinfo = __get_seqinfo()
+    thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
+    templates_extracted = heur.infotodict(seqinfo)
 
     for subject in ['0001']:
         session = 'ses-0001'
@@ -513,18 +514,52 @@ def validate_heuristics_output(heuristics_script=None,seqinfo=None):
             stderr=subprocess.PIPE)
         if test_dir.exists():
             shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+
+        error = validation.stderr.decode('utf-8')
+        print("Stderr: ", error, '\n')
         return validation.stdout.decode('utf-8')
 
 
-def check_heuristic_script_integrity(heuristics_script=None,test_heuristics=False):
+def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
+    """
+    Check the output of a heuristics script.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+    seqinfo: seqinfo object
+        Object to run the heuristics on. If none a minimal default is used.
+    test_heuristics: bool
+        If true the heuristics script will execute all heuristics and actions
+        to confirm that they evaluate properly.
+
+    Returns
+    -------
+    df_scans: dataframe containing the scans captured by the heuristics. If
+     test_heuiristics=True will return None.
+    """
     if heuristics_script is None:
-        from heudiconv_helpers.sample_heuristics import infotodict, filter_files, create_key
+        import heudiconv_helpers.sample_heuristics as heur
     else:
         heuristics_script = Path(heuristics_script.absolute()).as_posix()
-        heuristics = hh_load_heuristic(heuristics_script)
-        infotodict = heuristics.infotodict
-    seqinfo = __get_seqinfo()
-    infotodict(seqinfo,test_heuristics=test_heuristics)
+        heur = hh_load_heuristic(heuristics_script)
+    if not seqinfo:
+        seqinfo = __get_seqinfo()
+    heur_output = heur.infotodict(seqinfo, test_heuristics=test_heuristics)
+    if not test_heuristics:
+        dfs = []
+        for k, v in heur_output.items():
+            for v_i in v:
+                dfs.append(pd.DataFrame([v_i[0], k[0]],
+                                        index=["series_id", "template"]).T)
+        series_map = pd.concat([df for df in dfs], axis=0)
+
+        df_scans = series_map.merge(pd.DataFrame(seqinfo), on='series_id')
+    else:
+        df_scans = None
+
+    return df_scans
 
 
 def hh_load_heuristic(heu_path):

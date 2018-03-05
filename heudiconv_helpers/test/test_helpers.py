@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import pytest
 from pandas.util.testing import assert_series_equal
+from pandas.testing import assert_frame_equal
 from pathlib import Path
 import json
 import os.path as op
@@ -12,7 +13,7 @@ from heudiconv_helpers.helpers import hh_load_heuristic
 
 from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        host_is_hpc, validate_heuristics_output,
-                                       check_heuristic_script_integrity)
+                                       dry_run_heurs)
 from heudiconv_helpers.helpers import _set_fields
 from heudiconv_helpers.helpers import _get_fields
 from heudiconv_helpers.helpers import _del_fields
@@ -192,27 +193,45 @@ def test_validate_heuristics_output_no_arg():
     validate_heuristics_output()
 
 
-def test_check_heuristic_script_integrity():
+def test_dry_run_heurs():
     from heudiconv_helpers import helpers as hh
     heuristics_script = Path(hh.__file__).with_name(
         'sample_heuristics.py')
-    check_heuristic_script_integrity(heuristics_script=heuristics_script)
+    # correctly returns a dataframe when not testing the heuristic
+    seqinfo = __get_seqinfo()
+    output = dry_run_heurs(
+        heuristics_script=heuristics_script,
+        seqinfo=seqinfo)
 
-    # syntax errors in criterion should be picked up
+    expected = pd.merge(
+        pd.DataFrame(
+            {"series_id": "id_for_dti",
+             "template": "sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi"},
+            index=[0]),
+        pd.DataFrame(
+            hh.__get_seqinfo_dict(),
+            index=[0]),
+        on="series_id")
+
+    print(output.iloc[:1, :])
+    print(expected)
+    assert_frame_equal(expected, output.iloc[:1, :], check_like=True)
+
+    # syntax errors in criterion should be picked up when testing
     temp_heur = Path("heuristic_test.py")
     temp_heur.write_text(
         heuristics_script.read_text().
         replace("'Axial DTI B=1000' == ", "Axial DTI B=1000 == ")
     )
     with pytest.raises(SyntaxError):
-        check_heuristic_script_integrity(heuristics_script=temp_heur)
+        dry_run_heurs(heuristics_script=temp_heur)
     with pytest.raises(SyntaxError):
-        check_heuristic_script_integrity(
+        dry_run_heurs(
             heuristics_script=temp_heur, test_heuristics=True)
 
     temp_heur.unlink()
 
-    # silly key error mistake
+    # silly key error mistake to pick up when testing
     temp_heur_2 = Path("heuristic_test_2.py")
     temp_heur_2.write_text(
         heuristics_script.read_text().
@@ -221,14 +240,14 @@ def test_check_heuristic_script_integrity():
     print(heuristics_script.read_text().
           replace("""info[dti_fmap]""", """info['dti_fmap']"""))
     with pytest.raises(AttributeError):
-        check_heuristic_script_integrity(
+        dry_run_heurs(
             heuristics_script=temp_heur_2.as_posix())
 
     with pytest.raises(KeyError):
-        check_heuristic_script_integrity(
+        dry_run_heurs(
             heuristics_script=temp_heur_2, test_heuristics=True)
 
-    check_heuristic_script_integrity(
+    dry_run_heurs(
         heuristics_script=temp_heur_2)
 
     temp_heur_2.unlink()
@@ -248,6 +267,7 @@ def test_load_heuristic():
 
 
 def test_hh_load_heuristic():
+
     from heudiconv_helpers import helpers as hh
     HEURISTICS_PATH = Path(hh.__file__).parent
     from_file = hh_load_heuristic(
