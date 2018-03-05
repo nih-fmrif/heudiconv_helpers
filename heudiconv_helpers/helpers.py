@@ -5,6 +5,16 @@ import pandas as pd
 import json
 import platform
 import os
+import os.path as op
+from heudiconv.utils import load_heuristic
+from collections import namedtuple
+from heudiconv_helpers import helpers as hh
+import sys
+import shutil
+import subprocess
+from importlib import reload
+__version__ = "helpers:0.0.4"
+print(__version__)
 
 
 def coerce_to_int(num, name):
@@ -220,7 +230,7 @@ def host_is_hpc(sim=False, host_simulated="helix.nih.gov"):
     if sim:
         host = host_simulated
     else:
-            host = platform.node()
+        host = platform.node()
     if any(h in host for h in ['biowulf', 'helix', 'felix']):
         hpc = True
     else:
@@ -444,3 +454,129 @@ def make_symlink_template(row, project_dir_absolute):
         '*' + \
         ''.join(Path(row.dicom_path).suffixes)
     return template
+
+
+def __get_seqinfo_dict():
+    key_list = ['total_files_till_now', 'example_dcm_file', 'series_id',
+                'dcm_dir_name', 'unspecified2', 'unspecified3', 'dim1', 'dim2',
+                'dim3', 'dim4', 'TR', 'TE', 'protocol_name',
+                'is_motion_corrected', 'is_derived', 'patient_id',
+                'study_description', 'referring_physician_name',
+                'series_description', 'sequence_name', 'image_type',
+                'accession_number', 'patient_age', 'patient_sex']
+
+    seqinfo_dict = {k: np.nan for k in key_list}
+    seqinfo_dict['series_id'] = 'id_for_dti'
+    seqinfo_dict['series_description'] = 'a DTI series description'
+    seqinfo_dict['dim1'] = 10
+    return seqinfo_dict
+
+
+def __get_seqinfo():
+    seqinfo_dict = __get_seqinfo_dict()
+    seqinfo_element = namedtuple('seqinfo_class', seqinfo_dict.keys())
+    seqinfo = [seqinfo_element(**seqinfo_dict),
+               seqinfo_element(**seqinfo_dict)]
+    return seqinfo
+
+
+def validate_heuristics_output(heuristics_script=None):
+    test_dir = Path('bids_test/')
+    if test_dir.exists():
+        shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+    if not shutil.which('docker'):
+        raise EnvironmentError("Cannot find docker on path")
+    if heuristics_script is None:
+        import heudiconv_helpers.sample_heuristics as heur
+    else:
+        heur = hh_load_heuristic(Path(heuristics_script).as_posix())
+
+    seqinfo = __get_seqinfo()
+    thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
+    templates_extracted = heur.infotodict(seqinfo)
+
+    for subject in ['0001']:
+        session = 'ses-0001'
+        item = 1
+        for template, _, _ in templates_extracted.keys():
+            if template.find('derivatives') > -1:
+                pass
+            else:
+                file = test_dir.joinpath(template.format(**locals()))
+                os.makedirs('/'.join(file.parts[:-1]), exist_ok=True)
+                file.with_suffix('.nii.gz').symlink_to(thenifti.absolute())
+
+        validation = subprocess.run(
+            'docker run --rm -v $PWD/bids_test:/data:ro\
+             bids/validator:0.25.9 /data',
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        if test_dir.exists():
+            shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+
+        error = validation.stderr.decode('utf-8')
+        print("Stderr: ", error, '\n')
+        return validation.stdout.decode('utf-8')
+
+
+def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
+    """
+    Check the output of a heuristics script.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+    seqinfo: seqinfo object
+        Object to run the heuristics on. If none a minimal default is used.
+    test_heuristics: bool
+        If true the heuristics script will execute all heuristics and actions
+        to confirm that they evaluate properly.
+
+    Returns
+    -------
+    df_scans: dataframe containing the scans captured by the heuristics. If
+     test_heuiristics=True will return None.
+    """
+    if heuristics_script is None:
+        import heudiconv_helpers.sample_heuristics as heur
+    else:
+        heuristics_script = Path(heuristics_script.absolute()).as_posix()
+        heur = hh_load_heuristic(heuristics_script)
+    if not seqinfo:
+        seqinfo = __get_seqinfo()
+    heur_output = heur.infotodict(seqinfo, test_heuristics=test_heuristics)
+    if not test_heuristics:
+        dfs = []
+        for k, v in heur_output.items():
+            for v_i in v:
+                dfs.append(pd.DataFrame([v_i[0], k[0]],
+                                        index=["series_id", "template"]).T)
+        series_map = pd.concat([df for df in dfs], axis=0)
+
+        df_scans = series_map.merge(
+            pd.DataFrame(seqinfo),
+             on='series_id',
+             how = 'outer')
+    else:
+        df_scans = None
+
+    return df_scans
+
+
+def hh_load_heuristic(heu_path):
+    """Load heuristic from the file, return the module
+    """
+    heu_full_path = Path(heu_path).absolute().as_posix()
+    path, fname = op.split(heu_full_path)
+    try:
+        old_syspath = sys.path[:]
+        sys.path.append(path)
+        mod = __import__(fname.split('.')[0])
+        reload(mod)
+        mod.filename = heu_full_path
+    finally:
+        sys.path = old_syspath
+
+    return mod
