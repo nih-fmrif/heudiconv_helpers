@@ -555,7 +555,10 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
                                         index=["series_id", "template"]).T)
         series_map = pd.concat([df for df in dfs], axis=0)
 
-        df_scans = series_map.merge(pd.DataFrame(seqinfo), on='series_id')
+        df_scans = series_map.merge(
+            pd.DataFrame(seqinfo),
+             on='series_id',
+             how = 'outer')
     else:
         df_scans = None
 
