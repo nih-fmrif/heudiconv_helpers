@@ -489,7 +489,7 @@ def validate_heuristics_output(heuristics_script=None):
     if heuristics_script is None:
         import heudiconv_helpers.sample_heuristics as heur
     else:
-        heur = load_heuristic(Path(heuristics_script).as_posix())
+        heur = hh_load_heuristic(Path(heuristics_script).as_posix())
 
     seqinfo = __get_seqinfo()
     thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
