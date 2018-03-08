@@ -7,7 +7,6 @@ from pathlib import Path
 import json
 import os.path as op
 
-from heudiconv.utils import load_heuristic
 from heudiconv_helpers.helpers import hh_load_heuristic
 
 
@@ -239,31 +238,19 @@ def test_dry_run_heurs():
     )
     print(heuristics_script.read_text().
           replace("""info[dti_fmap]""", """info['dti_fmap']"""))
-    with pytest.raises(AttributeError):
-        dry_run_heurs(
-            heuristics_script=temp_heur_2.as_posix())
+    # TODO John: figure out what this was supposed to do
+    #with pytest.raises(AttributeError):
+    #    dry_run_heurs(
+    #        heuristics_script=temp_heur_2)
 
     with pytest.raises(KeyError):
         dry_run_heurs(
-            heuristics_script=temp_heur_2, test_heuristics=True)
+            heuristics_script=temp_heur_2.as_posix(), test_heuristics=True)
 
     dry_run_heurs(
-        heuristics_script=temp_heur_2)
+        heuristics_script=temp_heur_2.as_posix())
 
     temp_heur_2.unlink()
-
-
-def test_load_heuristic():
-    from heudiconv_helpers import helpers as hh
-    HEURISTICS_PATH = Path(hh.__file__).parent
-    from_file = load_heuristic(
-        op.join(HEURISTICS_PATH, 'sample_heuristics.py'))
-
-    with pytest.raises(ImportError):
-        load_heuristic('unknownsomething')
-
-    with pytest.raises(ImportError):
-        load_heuristic(op.join(HEURISTICS_PATH, 'unknownsomething.py'))
 
 
 def test_hh_load_heuristic():

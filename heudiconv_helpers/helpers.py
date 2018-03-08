@@ -5,8 +5,8 @@ import pandas as pd
 import json
 import platform
 import os
+import datetime
 import os.path as op
-from heudiconv.utils import load_heuristic
 from collections import namedtuple
 from heudiconv_helpers import helpers as hh
 import sys
@@ -481,9 +481,63 @@ def __get_seqinfo():
 
 
 def validate_heuristics_output(heuristics_script=None):
-    test_dir = Path('bids_test/')
+    """
+    Run the bids validator on a dummy directory created from a
+    heudiconv heuristics file.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+
+    Returns
+    -------
+    validation_output: string
+        bids validation output as a string
+    """
+    test_dir = __make_bids_tree(heuristics_script)
+
+    validation = subprocess.run(
+        'docker run --rm -v $PWD/bids_test:/data:ro\
+         bids/validator:0.25.9 /data',
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+
+        error = validation.stderr.decode('utf-8')
+        print("Stderr: ", error, '\n')
+        return validation.stdout.decode('utf-8')
+
+
+def __make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
+                     clear_tree=False):
+    """
+    Create a dummy bids tree from a heuristics script for validation.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+    test_dir: pathlib.Path, default is bids_test in current directory
+        Path to output the bids tree to.
+    clear_tree: bool
+        If True, delete the directory at the test_dir path before
+        creating a new one.
+
+    Returns
+    -------
+    test_dir: pathlib.Path
+        Path that the bids tree was output to.
+
+    """
+    if test_dir.exists():
+        if clear_tree:
+            shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+        else:
+            ValueError("The test_dir must either be a nonexistent directory or"
+                       "clear_tree must be True.")
     if not shutil.which('docker'):
         raise EnvironmentError("Cannot find docker on path")
     if heuristics_script is None:
@@ -504,20 +558,42 @@ def validate_heuristics_output(heuristics_script=None):
             else:
                 file = test_dir.joinpath(template.format(**locals()))
                 os.makedirs('/'.join(file.parts[:-1]), exist_ok=True)
-                file.with_suffix('.nii.gz').symlink_to(thenifti.absolute())
+                file.with_suffix('.nii.gz').touch()
+                # Create a json for each image
+                file.with_suffix('.json').touch()
+                # if the modality is dwi, create bval and bvec sidecars
+                if file.as_posix().split('_')[-1] == "dwi":
+                    bvec_str = "0\n0\n0\n"
+                    bval_str = "0\n"
+                    file.with_suffix('.bval').write_text(bval_str)
+                    file.with_suffix('.bvec').write_text(bvec_str)
+                # if the modality is bold, create an events.tsv
+                elif file.as_posix().split('_')[-1] == "bold":
+                    ev_fn = ('_'.join(file.parts[-1]
+                                          .split('_')[:-1])
+                             + '_events')
+                    events_str = "onset\tduration\n"
+                    # write events files
+                    (file.parent/ev_fn).with_suffix('.tsv').write_text(events_str)
 
-        validation = subprocess.run(
-            'docker run --rm -v $PWD/bids_test:/data:ro\
-             bids/validator:0.25.9 /data',
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        if test_dir.exists():
-            shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+                # add a line to the scans.tsv
+                ses_dir = Path('/'.join(file.parts[:-2]))
+                scans_file = (ses_dir/('_'.join(ses_dir.parts[-2:])
+                              + '_scans.tsv'))
+                try:
+                    scans_str = scans_file.read_text()
+                except FileNotFoundError:
+                    scans_str = 'filename\tacq_time\n'
+                scans_str += ((Path('/'.join(file.parts[-2:]))
+                              .with_suffix('.nii.gz').as_posix())
+                              + '\t'
+                              + (datetime.datetime.now()
+                                 .strftime("%Y-%m-%dT%H:%M:%S"))
+                              + '\n')
+                # Write the scans file with the new line added
+                scans_file.write_text(scans_str)
 
-        error = validation.stderr.decode('utf-8')
-        print("Stderr: ", error, '\n')
-        return validation.stdout.decode('utf-8')
+    return test_dir
 
 
 def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
@@ -542,7 +618,7 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
     if heuristics_script is None:
         import heudiconv_helpers.sample_heuristics as heur
     else:
-        heuristics_script = Path(heuristics_script.absolute()).as_posix()
+        heuristics_script = Path(heuristics_script).absolute().as_posix()
         heur = hh_load_heuristic(heuristics_script)
     if not seqinfo:
         seqinfo = __get_seqinfo()
@@ -557,8 +633,8 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
 
         df_scans = series_map.merge(
             pd.DataFrame(seqinfo),
-             on='series_id',
-             how = 'outer')
+            on='series_id',
+            how='outer')
     else:
         df_scans = None
 

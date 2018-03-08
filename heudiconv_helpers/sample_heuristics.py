@@ -51,7 +51,7 @@ def infotodict(seqinfo, test_heuristics=False):
     cube_t2 = create_key(
         'sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_T2w')
     hippo = create_key(
-        'sub-{subject}/{session}/fmap/sub-{subject}_{session}_acq-highreshipporun-{item:03d}_T1w')
+        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-highreshippo_run-{item:03d}_T1w')
     flair_3d = create_key(
         'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-3d_run-{item:03d}_FLAIR')
     avdc = create_key(
