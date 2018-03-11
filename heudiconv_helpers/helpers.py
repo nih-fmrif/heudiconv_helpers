@@ -13,7 +13,7 @@ import sys
 import shutil
 import subprocess
 from importlib import reload
-__version__ = "helpers:0.0.4"
+__version__ = "helpers:0.0.5"
 print(__version__)
 
 
