@@ -5,6 +5,8 @@ from pandas.util.testing import assert_series_equal
 from pandas.testing import assert_frame_equal
 from pathlib import Path
 import json
+import tempfile
+import shutil
 import os.path as op
 
 from heudiconv_helpers.helpers import hh_load_heuristic
@@ -12,12 +14,9 @@ from heudiconv_helpers.helpers import hh_load_heuristic
 
 from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        host_is_hpc, validate_heuristics_output,
-                                       dry_run_heurs)
-from heudiconv_helpers.helpers import _set_fields
-from heudiconv_helpers.helpers import _get_fields
-from heudiconv_helpers.helpers import _del_fields
-from heudiconv_helpers.helpers import _get_outcmd
-from heudiconv_helpers.helpers import __get_seqinfo
+                                       dry_run_heurs, _set_fields, _get_fields,
+                                       _del_fields, _get_outcmd, __get_seqinfo,
+                                       __make_bids_tree, mvrm_bids_image)
 
 
 def test_gen_slice_timings():
@@ -265,3 +264,47 @@ def test_hh_load_heuristic():
 
     with pytest.raises(ImportError):
         hh_load_heuristic(op.join(HEURISTICS_PATH, 'unknownsomething.py'))
+
+
+def test_mvrm_bids_image_mv():
+    tmp = tempfile.mkdtemp()
+    bids_test_path = Path(tmp, 'bids_test')
+    deleted_path = Path(tmp, 'deleted_scans')
+
+    __make_bids_tree(test_dir=bids_test_path, clear_tree=True)
+    scan_file = list(bids_test_path.glob('*/*/*scans.tsv'))[0]
+    orig_files = list(bids_test_path.glob('*/*/*/*.nii.gz'))
+    assert not deleted_path.exists()
+
+    # Test mv funcitonality
+    deleted_files = []
+    while orig_files:
+        file = orig_files.pop()
+        row = pd.Series({"image_path": file})
+        mvrm_bids_image(row)
+        deleted_files.append(Path(file.as_posix().replace('bids_test',
+                                                          'deleted_scans')))
+        current_files = list(bids_test_path.glob('*/*/*/*.nii.gz'))
+        cur_del_files = list(deleted_path.glob('*/*/*/*.nii.gz'))
+
+        # Make sure nothing unexpected was moved
+        assert orig_files == current_files
+
+        # Make sure everything we expect to be moved was moved
+        for df in cur_del_files:
+            assert df in cur_del_files
+        for cdf in cur_del_files:
+            assert cdf in deleted_files
+
+        # Make sure the scan_file is updated correctly
+        scan_text = scan_file.read_text()
+        orig_scan_lines = [Path(*ogf.parts[-2:]).as_posix()
+                           for ogf in orig_files]
+        for ogf in orig_scan_lines:
+            assert ogf in scan_text
+        for ln, line in enumerate(scan_text.split('\n')):
+            if ln != 0 and line != '':
+                scf = line.split('\t')[0]
+                assert scf in orig_scan_lines
+
+    shutil.rmtree(tmp)
