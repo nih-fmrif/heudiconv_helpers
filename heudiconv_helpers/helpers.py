@@ -576,18 +576,18 @@ def __make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
                              + '_events')
                     events_str = "onset\tduration\n"
                     # write events files
-                    (file.parent/ev_fn).with_suffix('.tsv').write_text(events_str)
+                    (file.parent / ev_fn).with_suffix('.tsv').write_text(events_str)
 
                 # add a line to the scans.tsv
                 ses_dir = Path(*file.parts[:-2])
-                scans_file = (ses_dir/('_'.join(ses_dir.parts[-2:])
-                              + '_scans.tsv'))
+                scans_file = (ses_dir / ('_'.join(ses_dir.parts[-2:])
+                                         + '_scans.tsv'))
                 try:
                     scans_str = scans_file.read_text()
                 except FileNotFoundError:
                     scans_str = 'filename\tacq_time\n'
                 scans_str += ((Path(*file.parts[-2:])
-                              .with_suffix('.nii.gz').as_posix())
+                               .with_suffix('.nii.gz').as_posix())
                               + '\t'
                               + (datetime.datetime.now()
                                  .strftime("%Y-%m-%dT%H:%M:%S"))
@@ -677,7 +677,7 @@ def __mvrm_file(image_path, file, dest=None):
     if dest is not None:
         sub_part_bools = ['sub-' in ip for ip in image_path.parts]
         root_ind = np.array(range(len(image_path.parts)))[sub_part_bools][-2]
-        file_dest = dest/Path(*file.parts[root_ind:])
+        file_dest = dest / Path(*file.parts[root_ind:])
         assert file_dest.name == file.name
         if not file_dest.parent.exists():
             file_dest.parent.mkdir(parents=True)
@@ -704,35 +704,36 @@ def __mvrm_bids_image(image_path, delete=False, dest=None):
         Defaults to 'deleted_scans' in the parent of the bids tree.
     """
     # Get the base of the image_path and modality
-    image_base = image_path.parent/image_path.parts[-1].split('.')[0]
+    image_base = image_path.parent / image_path.parts[-1].split('.')[0]
     modality = image_path.parts[-1].split('.')[0].split('_')[-1]
 
     # Make a default destination for deleted files
     if not delete and dest is None:
         sub_part_bools = ['sub-' in ip for ip in image_path.parts]
         root_ind = np.array(range(len(image_path.parts)))[sub_part_bools][-2]
-        dest = Path(*(image_path.parts[:root_ind-1]+tuple(['deleted_scans'])))
+        dest = Path(
+            *(image_path.parts[:root_ind - 1] + tuple(['deleted_scans'])))
 
     # Edit the scans.tsv
     ses_dir = Path(*image_path.parts[:-2])
-    scans_file = (ses_dir/('_'.join(ses_dir.parts[-2:]) + '_scans.tsv'))
+    scans_file = (ses_dir / ('_'.join(ses_dir.parts[-2:]) + '_scans.tsv'))
     orig_scans = scans_file.read_text().split('\n')
     new_scans = [ss for ss in orig_scans
                  if Path(*image_path.parts[-2:]).as_posix() not in ss]
     # Sanity check to make sure only one entry was removed before rewriting
-    assert len(orig_scans) == (len(new_scans)+1)
+    assert len(orig_scans) == (len(new_scans) + 1)
     scans_file.write_text('\n'.join(new_scans))
 
     # Remove or move all the files that share a name with the nifti
     # to be deleted
-    for file in image_base.parent.glob(image_base.name+'*'):
+    for file in image_base.parent.glob(image_base.name + '*'):
         __mvrm_file(image_path, file, dest=dest)
     # Deal with the events file for bolds
     if modality == "bold":
         ev_fn = ('_'.join(image_path.parts[-1]
                                     .split('_')[:-1])
                  + '_events.tsv')
-        event_file = image_path.parent/ev_fn
+        event_file = image_path.parent / ev_fn
         __mvrm_file(image_path, event_file, dest=dest)
 
     # remove parent if the directory is empty now
