@@ -268,7 +268,14 @@ def _get_setup():
         setup = 'module load singularity;'
     else:
         setup = ""
+    setup+="source deactivate;"
     return setup
+
+def _get_hbind():
+    sing_home_tmp = Path('~/temp_for_singularity').expanduser()
+    if not sing_home_tmp.exists():
+        sing_home_tmp.mkdir()
+    return " -H {sing_home_tmp}"
 
 
 def _get_heur(options):
@@ -371,6 +378,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     })
     options.update(kwargs)
     pbind = " --bind %s:/data" % Path(project_dir).as_posix()
+    hbind = _get_hbind()
     img = ' %s' % Path(container_image).absolute()
     setup = _get_setup()
     dev_str, options = _get_dev_str(options)
@@ -389,7 +397,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
 
     cmd = \
         f"""\
-{setup}singularity exec{pbind}{dev_str}{tmp_str}{img}\
+{setup}singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
  bash -c 'source activate neuro; /neurodocker/startup.sh;\
  heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
 {heur}{conv}{outcmd} -b{other_flags}'\
