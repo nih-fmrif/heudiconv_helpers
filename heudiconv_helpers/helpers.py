@@ -13,7 +13,7 @@ import sys
 import shutil
 import subprocess
 from importlib import reload
-__version__ = "helpers:0.0.5"
+__version__ = "helpers:0.0.6"
 print(__version__)
 
 
@@ -275,14 +275,14 @@ def _get_hbind():
     sing_home_tmp = Path('~/temp_for_singularity').expanduser()
     if not sing_home_tmp.exists():
         sing_home_tmp.mkdir()
-    return " -H {sing_home_tmp}"
+    return f" -H {sing_home_tmp}"
 
 
 def _get_heur(options):
     script = options.pop("heuristics_script")
     if not script:
         # use heuristics script inside container
-        heur = ' -f /src/heudiconv/heuristics/convertall.py'
+        heur = ' -f /src/heudiconv/heudiconv/heuristics/convertall.py'
     else:
         path = Path('/data').joinpath(script).as_posix()
         heur = " -f %s" % script
@@ -398,7 +398,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     cmd = \
         f"""\
 {setup}singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
- bash -c 'source activate neuro; /neurodocker/startup.sh;\
+ bash -c 'source activate neuro; /neurodocker/startup.sh\
  heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
 {heur}{conv}{outcmd} -b{other_flags}'\
 """
