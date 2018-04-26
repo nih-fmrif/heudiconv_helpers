@@ -15,6 +15,21 @@ import subprocess
 from importlib import reload
 
 
+def _get_default_opt_orddict():
+        options = OrderedDict({
+        "heuristics_script": None,
+        "anon_script": None,
+        "conversion": False,
+        "minmeta": False,
+        "overwrite": True,
+        "debug": False,
+        "dev": False,
+        "dev_dir": None,
+        "use_scratch": False
+        })
+        return options
+
+
 def coerce_to_int(num, name):
     if np.isclose(num, int(num)):
         num = int(num)
@@ -282,7 +297,7 @@ def _get_heur(options):
         heur = ' -f /src/heudiconv/heudiconv/heuristics/convertall.py'
     else:
         path = Path('/data').joinpath(script).as_posix()
-        heur = " -f %s" % script
+        heur = " -f %s" % path
     return heur, options
 
 
@@ -362,17 +377,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     """
     if not isinstance(row, pd.Series):
         raise ValueError("row needs to be a pandas series object")
-    options = OrderedDict({
-        "heuristics_script": None,
-        "anon_script": None,
-        "conversion": False,
-        "minmeta": False,
-        "overwrite": True,
-        "debug": False,
-        "dev": False,
-        "dev_dir": None,
-        "use_scratch": False
-    })
+    options = _get_default_opt_orddict()
     options.update(kwargs)
     pbind = " --bind %s:/data" % Path(project_dir).as_posix()
     hbind = _get_hbind()

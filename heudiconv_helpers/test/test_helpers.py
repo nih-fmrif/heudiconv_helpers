@@ -16,7 +16,8 @@ from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        host_is_hpc, validate_heuristics_output,
                                        dry_run_heurs, _set_fields, _get_fields,
                                        _del_fields, _get_outcmd, _get_seqinfo,
-                                       _make_bids_tree, mvrm_bids_image)
+                                       _make_bids_tree, mvrm_bids_image,_get_heur,
+                                       _get_default_opt_orddict)
 
 
 def test_gen_slice_timings():
@@ -251,6 +252,11 @@ def test_validate_heuristics_output_no_arg():
 
 #     temp_heur_2.unlink()
 
+
+def  test_get_heur():
+    options = _get_default_opt_orddict()
+    options.update({'heuristics_script': 'a_path'})
+    assert (' -f /data/a_path',options) == _get_heur(options)
 
 def test_hh_load_heuristic():
 
