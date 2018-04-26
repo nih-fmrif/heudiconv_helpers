@@ -461,7 +461,7 @@ def make_symlink_template(row, project_dir_absolute):
     return template
 
 
-def __get_seqinfo_dict():
+def _get_seqinfo_dict():
     key_list = ['total_files_till_now', 'example_dcm_file', 'series_id',
                 'dcm_dir_name', 'unspecified2', 'unspecified3', 'dim1', 'dim2',
                 'dim3', 'dim4', 'TR', 'TE', 'protocol_name',
@@ -477,8 +477,8 @@ def __get_seqinfo_dict():
     return seqinfo_dict
 
 
-def __get_seqinfo():
-    seqinfo_dict = __get_seqinfo_dict()
+def _get_seqinfo():
+    seqinfo_dict = _get_seqinfo_dict()
     seqinfo_element = namedtuple('seqinfo_class', seqinfo_dict.keys())
     seqinfo = [seqinfo_element(**seqinfo_dict),
                seqinfo_element(**seqinfo_dict)]
@@ -500,7 +500,7 @@ def validate_heuristics_output(heuristics_script=None):
     validation_output: string
         bids validation output as a string
     """
-    test_dir = __make_bids_tree(heuristics_script)
+    test_dir = _make_bids_tree(heuristics_script)
 
     validation = subprocess.run(
         'docker run --rm -v $PWD/bids_test:/data:ro\
@@ -516,7 +516,7 @@ def validate_heuristics_output(heuristics_script=None):
         return validation.stdout.decode('utf-8')
 
 
-def __make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
+def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
                      clear_tree=False):
     """
     Create a dummy bids tree from a heuristics script for validation.
@@ -550,7 +550,7 @@ def __make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
     else:
         heur = hh_load_heuristic(Path(heuristics_script).as_posix())
 
-    seqinfo = __get_seqinfo()
+    seqinfo = _get_seqinfo()
     thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
     templates_extracted = heur.infotodict(seqinfo)
 
@@ -628,7 +628,7 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
         heuristics_script = Path(heuristics_script).absolute().as_posix()
         heur = hh_load_heuristic(heuristics_script)
     if not seqinfo:
-        seqinfo = __get_seqinfo()
+        seqinfo = _get_seqinfo()
     heur_output = heur.infotodict(seqinfo, test_heuristics=test_heuristics)
     if not test_heuristics:
         dfs = []
@@ -667,7 +667,7 @@ def hh_load_heuristic(heu_path):
     return mod
 
 
-def __mvrm_file(image_path, file, dest=None):
+def _mvrm_file(image_path, file, dest=None):
     """
     Move or remove a file from the bids tree containing an image_path.
 
@@ -693,7 +693,7 @@ def __mvrm_file(image_path, file, dest=None):
         os.remove(file)
 
 
-def __mvrm_bids_image(image_path, delete=False, dest=None):
+def _mvrm_bids_image(image_path, delete=False, dest=None):
     """
     Remove an image from a bids tree.
     Either by deleting the image and associated files or
@@ -734,14 +734,14 @@ def __mvrm_bids_image(image_path, delete=False, dest=None):
     # Remove or move all the files that share a name with the nifti
     # to be deleted
     for file in image_base.parent.glob(image_base.name + '*'):
-        __mvrm_file(image_path, file, dest=dest)
+        _mvrm_file(image_path, file, dest=dest)
     # Deal with the events file for bolds
     if modality == "bold":
         ev_fn = ('_'.join(image_path.parts[-1]
                                     .split('_')[:-1])
                  + '_events.tsv')
         event_file = image_path.parent / ev_fn
-        __mvrm_file(image_path, event_file, dest=dest)
+        _mvrm_file(image_path, event_file, dest=dest)
 
     # remove parent if the directory is empty now
     if len(list(image_base.parent.iterdir())) == 0:
@@ -765,7 +765,7 @@ def mvrm_bids_image(row, delete=False, dest=None):
         root of the bids tree where you would like the deleted file moved.
         Defaults to 'deleted_scans' in the parent of the bids tree.
     """
-    __mvrm_bids_image(row.image_path, delete=delete, dest=dest)
+    _mvrm_bids_image(row.image_path, delete=delete, dest=dest)
 
 
 def flatten(items):

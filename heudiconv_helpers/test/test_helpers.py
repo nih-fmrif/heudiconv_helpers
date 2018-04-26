@@ -15,8 +15,8 @@ from heudiconv_helpers.helpers import hh_load_heuristic
 from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        host_is_hpc, validate_heuristics_output,
                                        dry_run_heurs, _set_fields, _get_fields,
-                                       _del_fields, _get_outcmd, __get_seqinfo,
-                                       __make_bids_tree, mvrm_bids_image)
+                                       _del_fields, _get_outcmd, _get_seqinfo,
+                                       _make_bids_tree, mvrm_bids_image)
 
 
 def test_gen_slice_timings():
@@ -196,7 +196,7 @@ def test_validate_heuristics_output_no_arg():
 #     heuristics_script = Path(hh.__file__).with_name(
 #         'sample_heuristics.py')
 #     # correctly returns a dataframe when not testing the heuristic
-#     seqinfo = __get_seqinfo()
+#     seqinfo = _get_seqinfo()
 #     output = dry_run_heurs(
 #         heuristics_script=heuristics_script,
 #         seqinfo=seqinfo)
@@ -207,7 +207,7 @@ def test_validate_heuristics_output_no_arg():
 #              "template": "sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi"},
 #             index=[0]),
 #         pd.DataFrame(
-#             hh.__get_seqinfo_dict(),
+#             hh._get_seqinfo_dict(),
 #             index=[0]),
 #         on="series_id")
 
@@ -271,7 +271,7 @@ def test_mvrm_bids_image_mv():
     bids_test_path = Path(tmp, 'bids_test')
     deleted_path = Path(tmp, 'deleted_scans')
 
-    __make_bids_tree(test_dir=bids_test_path, clear_tree=True)
+    _make_bids_tree(test_dir=bids_test_path, clear_tree=True)
     scan_file = list(bids_test_path.glob('*/*/*scans.tsv'))[0]
     orig_files = list(bids_test_path.glob('*/*/*/*.nii.gz'))
     assert not deleted_path.exists()
