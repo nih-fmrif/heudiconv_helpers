@@ -7,7 +7,7 @@ import platform
 import os
 import datetime
 import os.path as op
-from collections import namedtuple
+from collections import namedtuple, Iterable
 from heudiconv_helpers import helpers as hh
 import sys
 import shutil
@@ -268,7 +268,6 @@ def _get_setup():
         setup = 'module load singularity;'
     else:
         setup = ""
-    setup+="source deactivate;"
     return setup
 
 def _get_hbind():
@@ -398,9 +397,9 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     cmd = \
         f"""\
 {setup}singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
- bash -c 'source activate neuro; /neurodocker/startup.sh\
+ bash -c '/neurodocker/startup.sh\
  heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
-{heur}{conv}{outcmd} -b{other_flags}'\
+{heur}{conv}{outcmd} -p -b{other_flags}'\
 """
 
     output_dir = Path(output_dir).as_posix()
@@ -645,6 +644,8 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
             pd.DataFrame(seqinfo),
             on='series_id',
             how='outer')
+        first_cols = ['series_id','template','series_description','sequence_name']
+        df_scans = df_scans[first_cols + [c for c in df_scans if c not in first_cols] ]
     else:
         df_scans = None
 
@@ -767,3 +768,12 @@ def mvrm_bids_image(row, delete=False, dest=None):
         Defaults to 'deleted_scans' in the parent of the bids tree.
     """
     __mvrm_bids_image(row.image_path, delete=delete, dest=dest)
+
+
+def flatten(items):
+    """Yield items from any nested iterable; from beazley's python cookbook."""
+    for x in items:
+        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+            yield from flatten(x)
+        else:
+            yield x
