@@ -35,7 +35,7 @@ def infotodict(seqinfo, test_heuristics=False):
     t1w = create_key(
         'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-fspgr_run-{item:03d}_T1w')
     pcasl = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-_run-{item:03d}_pcasl')
+        'sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_pcasl')
     dti_ap = create_key(
         'sub-{subject}/{session}/dwi/sub-{subject}_{session}_acq-ap_run-{item:03d}_dwi')
     dti_pa = create_key(
@@ -71,40 +71,52 @@ def infotodict(seqinfo, test_heuristics=False):
             rest: [], cube_t2: [], hippo: [], flair_3d: [], avdc: [], cbf: [], fa: [], trace: [],
             resting_fmap: [], dti_fmap: []}
     heurs = {
-        "('Axial DTI B=1000' == s.series_description)": "info[dti_pa].append([s.series_id])",
-        "('Axial DTI 24vols flipped' == s.series_description)": "info[dti_ap].append([s.series_id])",
-        "('DTI' in s.series_description)": "info[dti].append([s.series_id])",
 
-        "('FSPGR' in s.series_description.upper())": "info[t1w].append([s.series_id])",
-        "('pCASL' == s.series_description)": "info[pcasl].append([s.series_id])",
-        "('ResHippo' in s.series_description)": "info[hippo].append([s.series_id])",
-        "('T2 2D' in s.series_description)": "info[flair_2d].append([s.series_id])",
-        "('T2 Star' in s.series_description)": "info[t2_star].append([s.series_id])",
-        "('CUBE_T2' in s.series_description)": "info[cube_t2].append([s.series_id])",
-        "('3D FLAIR' in s.series_description)": "info[flair_3d].append([s.series_id])",
+        "('FSPGR' in seq.series_description.upper())": "info[t1w].append([seq.series_id])",
+        "('PCASL' in seq.series_description.upper())": "info[pcasl].append([seq.series_id])",
+        "('RESHIPPO' in seq.series_description.upper())": "info[hippo].append([seq.series_id])",
+        "('T2 2D' in seq.series_description.upper())": "info[flair_2d].append([seq.series_id])",
+        "('T2_FLAIR' in seq.series_description.upper())": "info[flair_2d].append([seq.series_id])",
+        "('Ax T2 FLAIR' in seq.series_description)": "info[flair_2d].append([seq.series_id])",
+        "('T2 STAR' in seq.series_description.upper())": "info[t2_star].append([seq.series_id])",
+        "('CUBE_T2' in seq.series_description.upper())": "info[cube_t2].append([seq.series_id])",
+        "('3D FLAIR' in seq.series_description.upper())": "info[flair_3d].append([seq.series_id])",
 
-        "('Axial rsfMRI' in s.series_description)": "info[rest].append([s.series_id])",
+        "('AXIAL RSFMRI' in seq.series_description.upper())": "info[rest].append([seq.series_id])",
 
-        "('AvDC' in s.series_description)": "info[avdc].append([s.series_id])",
-        "('CBF' in s.series_description)": "info[cbf].append([s.series_id])",
-        "('FA' in s.series_description)": "info[fa].append([s.series_id])",
-        "('Trace' in s.series_description)": "info[trace].append([s.series_id])",
+        "('AVDC' in seq.series_description.upper())": "info[avdc].append([seq.series_id])",
+        "('CBF' in seq.series_description.upper())": "info[cbf].append([seq.series_id])",
+        "('FA' in seq.series_description.upper())": "info[fa].append([seq.series_id])",
+        "('TRACE' in seq.series_description.upper())": "info[trace].append([seq.series_id])",
 
-        "('B0 Map - DTI' == s.series_description)": "info[dti_fmap]",
-        "('B0 Map - rsfMRI' == s.series_description)": "info[resting_fmap]",
+        "('B0 MAP - DTI' in seq.series_description.upper())": "info[dti_fmap]",
+        "('B0 MAP - RSFMRI' in seq.series_description.upper())": "info[resting_fmap]",
+        "('B0_MAP_RSFMRI' in seq.series_description.upper())": "info[resting_fmap]",
+        "('B0 Map - rsfMRI' in seq.series_description)": "info[resting_fmap]",
+        "('B0rf' == seq.sequence_name)": "info[resting_fmap]",
+
+        "('AXIAL DTI B=1000' in seq.series_description.upper())": "info[dti_pa].append([seq.series_id])",
+        "('AXIAL DTI 24VOLS FLIPPED' in seq.series_description.upper())": "info[dti_ap].append([seq.series_id])",
+        "('DTI' in seq.series_description)": "info[dti].append([seq.series_id])",
+
+
+
     }
 
     if test_heuristics:
-        for s in seqinfo:
+        for seq in seqinfo:
             for criterion, action in heurs.items():
                 eval(criterion)
                 eval(action)
             print("The defined heuristics evaluate")
             return None
-    for s in seqinfo:
+    for seq in seqinfo:
         for criterion, action in heurs.items():
             if eval(criterion):
                 eval(action)
                 break
+        #
 
     return info
+
+
