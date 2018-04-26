@@ -5,16 +5,14 @@ import pandas as pd
 import json
 import platform
 import os
+import datetime
 import os.path as op
-from heudiconv.utils import load_heuristic
-from collections import namedtuple
+from collections import namedtuple, Iterable
 from heudiconv_helpers import helpers as hh
 import sys
 import shutil
 import subprocess
 from importlib import reload
-__version__ = "helpers:0.0.4"
-print(__version__)
 
 
 def coerce_to_int(num, name):
@@ -270,12 +268,18 @@ def _get_setup():
         setup = ""
     return setup
 
+def _get_hbind():
+    sing_home_tmp = Path('~/temp_for_singularity').expanduser()
+    if not sing_home_tmp.exists():
+        sing_home_tmp.mkdir()
+    return f" -H {sing_home_tmp}"
+
 
 def _get_heur(options):
     script = options.pop("heuristics_script")
     if not script:
         # use heuristics script inside container
-        heur = ' -f /src/heudiconv/heuristics/convertall.py'
+        heur = ' -f /src/heudiconv/heudiconv/heuristics/convertall.py'
     else:
         path = Path('/data').joinpath(script).as_posix()
         heur = " -f %s" % script
@@ -371,6 +375,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     })
     options.update(kwargs)
     pbind = " --bind %s:/data" % Path(project_dir).as_posix()
+    hbind = _get_hbind()
     img = ' %s' % Path(container_image).absolute()
     setup = _get_setup()
     dev_str, options = _get_dev_str(options)
@@ -389,10 +394,10 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
 
     cmd = \
         f"""\
-{setup}singularity exec{pbind}{dev_str}{tmp_str}{img}\
- bash -c 'source activate neuro; /neurodocker/startup.sh;\
+{setup}singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
+ bash -c '/neurodocker/startup.sh\
  heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
-{heur}{conv}{outcmd} -b{other_flags}'\
+{heur}{conv}{outcmd} -p -b{other_flags}'\
 """
 
     output_dir = Path(output_dir).as_posix()
@@ -456,7 +461,7 @@ def make_symlink_template(row, project_dir_absolute):
     return template
 
 
-def __get_seqinfo_dict():
+def _get_seqinfo_dict():
     key_list = ['total_files_till_now', 'example_dcm_file', 'series_id',
                 'dcm_dir_name', 'unspecified2', 'unspecified3', 'dim1', 'dim2',
                 'dim3', 'dim4', 'TR', 'TE', 'protocol_name',
@@ -472,8 +477,8 @@ def __get_seqinfo_dict():
     return seqinfo_dict
 
 
-def __get_seqinfo():
-    seqinfo_dict = __get_seqinfo_dict()
+def _get_seqinfo():
+    seqinfo_dict = _get_seqinfo_dict()
     seqinfo_element = namedtuple('seqinfo_class', seqinfo_dict.keys())
     seqinfo = [seqinfo_element(**seqinfo_dict),
                seqinfo_element(**seqinfo_dict)]
@@ -481,9 +486,63 @@ def __get_seqinfo():
 
 
 def validate_heuristics_output(heuristics_script=None):
-    test_dir = Path('bids_test/')
+    """
+    Run the bids validator on a dummy directory created from a
+    heudiconv heuristics file.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+
+    Returns
+    -------
+    validation_output: string
+        bids validation output as a string
+    """
+    test_dir = _make_bids_tree(heuristics_script)
+
+    validation = subprocess.run(
+        'docker run --rm -v $PWD/bids_test:/data:ro\
+         bids/validator:0.25.9 /data',
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+
+        error = validation.stderr.decode('utf-8')
+        print("Stderr: ", error, '\n')
+        return validation.stdout.decode('utf-8')
+
+
+def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
+                     clear_tree=False):
+    """
+    Create a dummy bids tree from a heuristics script for validation.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+    test_dir: pathlib.Path, default is bids_test in current directory
+        Path to output the bids tree to.
+    clear_tree: bool
+        If True, delete the directory at the test_dir path before
+        creating a new one.
+
+    Returns
+    -------
+    test_dir: pathlib.Path
+        Path that the bids tree was output to.
+
+    """
+    if test_dir.exists():
+        if clear_tree:
+            shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+        else:
+            ValueError("The test_dir must either be a nonexistent directory or"
+                       "clear_tree must be True.")
     if not shutil.which('docker'):
         raise EnvironmentError("Cannot find docker on path")
     if heuristics_script is None:
@@ -491,7 +550,7 @@ def validate_heuristics_output(heuristics_script=None):
     else:
         heur = hh_load_heuristic(Path(heuristics_script).as_posix())
 
-    seqinfo = __get_seqinfo()
+    seqinfo = _get_seqinfo()
     thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
     templates_extracted = heur.infotodict(seqinfo)
 
@@ -504,20 +563,44 @@ def validate_heuristics_output(heuristics_script=None):
             else:
                 file = test_dir.joinpath(template.format(**locals()))
                 os.makedirs('/'.join(file.parts[:-1]), exist_ok=True)
-                file.with_suffix('.nii.gz').symlink_to(thenifti.absolute())
+                file.with_suffix('.nii.gz').touch()
+                # Create a json for each image
+                file.with_suffix('.json').touch()
+                modality = file.parts[-1].split('.')[0].split('_')[-1]
 
-        validation = subprocess.run(
-            'docker run --rm -v $PWD/bids_test:/data:ro\
-             bids/validator:0.25.9 /data',
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        if test_dir.exists():
-            shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+                # if the modality is dwi, create bval and bvec sidecars
+                if modality == "dwi":
+                    bvec_str = "0\n0\n0\n"
+                    bval_str = "0\n"
+                    file.with_suffix('.bval').write_text(bval_str)
+                    file.with_suffix('.bvec').write_text(bvec_str)
+                # if the modality is bold, create an events.tsv
+                elif modality == "bold":
+                    ev_fn = ('_'.join(file.parts[-1]
+                                          .split('_')[:-1])
+                             + '_events')
+                    events_str = "onset\tduration\n"
+                    # write events files
+                    (file.parent / ev_fn).with_suffix('.tsv').write_text(events_str)
 
-        error = validation.stderr.decode('utf-8')
-        print("Stderr: ", error, '\n')
-        return validation.stdout.decode('utf-8')
+                # add a line to the scans.tsv
+                ses_dir = Path(*file.parts[:-2])
+                scans_file = (ses_dir / ('_'.join(ses_dir.parts[-2:])
+                                         + '_scans.tsv'))
+                try:
+                    scans_str = scans_file.read_text()
+                except FileNotFoundError:
+                    scans_str = 'filename\tacq_time\n'
+                scans_str += ((Path(*file.parts[-2:])
+                               .with_suffix('.nii.gz').as_posix())
+                              + '\t'
+                              + (datetime.datetime.now()
+                                 .strftime("%Y-%m-%dT%H:%M:%S"))
+                              + '\n')
+                # Write the scans file with the new line added
+                scans_file.write_text(scans_str)
+
+    return test_dir
 
 
 def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
@@ -542,10 +625,10 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
     if heuristics_script is None:
         import heudiconv_helpers.sample_heuristics as heur
     else:
-        heuristics_script = Path(heuristics_script.absolute()).as_posix()
+        heuristics_script = Path(heuristics_script).absolute().as_posix()
         heur = hh_load_heuristic(heuristics_script)
     if not seqinfo:
-        seqinfo = __get_seqinfo()
+        seqinfo = _get_seqinfo()
     heur_output = heur.infotodict(seqinfo, test_heuristics=test_heuristics)
     if not test_heuristics:
         dfs = []
@@ -557,8 +640,10 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
 
         df_scans = series_map.merge(
             pd.DataFrame(seqinfo),
-             on='series_id',
-             how = 'outer')
+            on='series_id',
+            how='outer')
+        first_cols = ['series_id','template','series_description','sequence_name']
+        df_scans = df_scans[first_cols + [c for c in df_scans if c not in first_cols] ]
     else:
         df_scans = None
 
@@ -580,3 +665,113 @@ def hh_load_heuristic(heu_path):
         sys.path = old_syspath
 
     return mod
+
+
+def _mvrm_file(image_path, file, dest=None):
+    """
+    Move or remove a file from the bids tree containing an image_path.
+
+    Parameters
+    ----------
+    image_path: pathlib.Path
+        Path to the image being removed
+    file: pathlib.Path
+        Path to the file being removed
+    dest: pathlib.Path
+        root of the bids tree where you would like the deleted file moved.
+        If None, the file will be removed.
+    """
+    if dest is not None:
+        sub_part_bools = ['sub-' in ip for ip in image_path.parts]
+        root_ind = np.array(range(len(image_path.parts)))[sub_part_bools][-2]
+        file_dest = dest / Path(*file.parts[root_ind:])
+        assert file_dest.name == file.name
+        if not file_dest.parent.exists():
+            file_dest.parent.mkdir(parents=True)
+        shutil.move(file, file_dest)
+    else:
+        os.remove(file)
+
+
+def _mvrm_bids_image(image_path, delete=False, dest=None):
+    """
+    Remove an image from a bids tree.
+    Either by deleting the image and associated files or
+    by moving it to a 'deleted_scans' directory in the
+    parent of the bids tree or another specified destination.
+
+    Parameters
+    ----------
+    image_path: pathlib.Path
+        Path to the image being removed
+    delete: bool
+        Set to True to delete the files, otherwise they'll be moved.
+    dest: pathlib.Path
+        root of the bids tree where you would like the deleted file moved.
+        Defaults to 'deleted_scans' in the parent of the bids tree.
+    """
+    # Get the base of the image_path and modality
+    image_base = image_path.parent / image_path.parts[-1].split('.')[0]
+    modality = image_path.parts[-1].split('.')[0].split('_')[-1]
+
+    # Make a default destination for deleted files
+    if not delete and dest is None:
+        sub_part_bools = ['sub-' in ip for ip in image_path.parts]
+        root_ind = np.array(range(len(image_path.parts)))[sub_part_bools][-2]
+        dest = Path(
+            *(image_path.parts[:root_ind - 1] + tuple(['deleted_scans'])))
+
+    # Edit the scans.tsv
+    ses_dir = Path(*image_path.parts[:-2])
+    scans_file = (ses_dir / ('_'.join(ses_dir.parts[-2:]) + '_scans.tsv'))
+    orig_scans = scans_file.read_text().split('\n')
+    new_scans = [ss for ss in orig_scans
+                 if Path(*image_path.parts[-2:]).as_posix() not in ss]
+    # Sanity check to make sure only one entry was removed before rewriting
+    assert len(orig_scans) == (len(new_scans) + 1)
+    scans_file.write_text('\n'.join(new_scans))
+
+    # Remove or move all the files that share a name with the nifti
+    # to be deleted
+    for file in image_base.parent.glob(image_base.name + '*'):
+        _mvrm_file(image_path, file, dest=dest)
+    # Deal with the events file for bolds
+    if modality == "bold":
+        ev_fn = ('_'.join(image_path.parts[-1]
+                                    .split('_')[:-1])
+                 + '_events.tsv')
+        event_file = image_path.parent / ev_fn
+        _mvrm_file(image_path, event_file, dest=dest)
+
+    # remove parent if the directory is empty now
+    if len(list(image_base.parent.iterdir())) == 0:
+        image_base.parent.rmdir()
+
+
+def mvrm_bids_image(row, delete=False, dest=None):
+    """
+    Remove an images specified in the image_path field of a row
+    from a bids tree. Either by deleting the image and associated files or
+    by moving it to a 'deleted_scans' directory in the
+    parent of the bids tree or another specified destination.
+
+    Parameters
+    ----------
+    row: pandas.Series
+        Row containing an image_path field for the image to be removed.
+    delete: bool
+        Set to True to delete the files, otherwise they'll be moved.
+    dest: pathlib.Path
+        root of the bids tree where you would like the deleted file moved.
+        Defaults to 'deleted_scans' in the parent of the bids tree.
+    """
+    _mvrm_bids_image(row.image_path, delete=delete, dest=dest)
+
+
+def flatten(items):
+    """Yield items from any nested iterable; from beazley's python cookbook."""
+    for x in items:
+        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+            yield from flatten(x)
+        else:
+            yield x

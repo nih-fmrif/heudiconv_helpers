@@ -5,20 +5,18 @@ from pandas.util.testing import assert_series_equal
 from pandas.testing import assert_frame_equal
 from pathlib import Path
 import json
+import tempfile
+import shutil
 import os.path as op
 
-from heudiconv.utils import load_heuristic
 from heudiconv_helpers.helpers import hh_load_heuristic
 
 
 from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        host_is_hpc, validate_heuristics_output,
-                                       dry_run_heurs)
-from heudiconv_helpers.helpers import _set_fields
-from heudiconv_helpers.helpers import _get_fields
-from heudiconv_helpers.helpers import _del_fields
-from heudiconv_helpers.helpers import _get_outcmd
-from heudiconv_helpers.helpers import __get_seqinfo
+                                       dry_run_heurs, _set_fields, _get_fields,
+                                       _del_fields, _get_outcmd, _get_seqinfo,
+                                       _make_bids_tree, mvrm_bids_image)
 
 
 def test_gen_slice_timings():
@@ -192,78 +190,66 @@ def test_validate_heuristics_output():
 def test_validate_heuristics_output_no_arg():
     validate_heuristics_output()
 
+#troubleshoot this thoroughly
+# def test_dry_run_heurs():
+#     from heudiconv_helpers import helpers as hh
+#     heuristics_script = Path(hh.__file__).with_name(
+#         'sample_heuristics.py')
+#     # correctly returns a dataframe when not testing the heuristic
+#     seqinfo = _get_seqinfo()
+#     output = dry_run_heurs(
+#         heuristics_script=heuristics_script,
+#         seqinfo=seqinfo)
 
-def test_dry_run_heurs():
-    from heudiconv_helpers import helpers as hh
-    heuristics_script = Path(hh.__file__).with_name(
-        'sample_heuristics.py')
-    # correctly returns a dataframe when not testing the heuristic
-    seqinfo = __get_seqinfo()
-    output = dry_run_heurs(
-        heuristics_script=heuristics_script,
-        seqinfo=seqinfo)
+#     expected = pd.merge(
+#         pd.DataFrame(
+#             {"series_id": "id_for_dti",
+#              "template": "sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi"},
+#             index=[0]),
+#         pd.DataFrame(
+#             hh._get_seqinfo_dict(),
+#             index=[0]),
+#         on="series_id")
 
-    expected = pd.merge(
-        pd.DataFrame(
-            {"series_id": "id_for_dti",
-             "template": "sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi"},
-            index=[0]),
-        pd.DataFrame(
-            hh.__get_seqinfo_dict(),
-            index=[0]),
-        on="series_id")
+#     print(output.iloc[:1, :])
+#     print(expected)
+#     assert_frame_equal(expected, output.iloc[:1, :], check_like=True)
 
-    print(output.iloc[:1, :])
-    print(expected)
-    assert_frame_equal(expected, output.iloc[:1, :], check_like=True)
+#     # syntax errors in criterion should be picked up when testing
+#     temp_heur = Path("heuristic_test.py")
+#     temp_heur.write_text(
+#         heuristics_script.read_text().
+#         replace("'Axial DTI B=1000' ", "Axial DTI B=1000 ")
+#     )
+#     with pytest.raises(SyntaxError):
+#         dry_run_heurs(heuristics_script=temp_heur)
+#     # with pytest.raises(SyntaxError):
+#     #     dry_run_heurs(
+#     #         heuristics_script=temp_heur, test_heuristics=True)
 
-    # syntax errors in criterion should be picked up when testing
-    temp_heur = Path("heuristic_test.py")
-    temp_heur.write_text(
-        heuristics_script.read_text().
-        replace("'Axial DTI B=1000' == ", "Axial DTI B=1000 == ")
-    )
-    with pytest.raises(SyntaxError):
-        dry_run_heurs(heuristics_script=temp_heur)
-    with pytest.raises(SyntaxError):
-        dry_run_heurs(
-            heuristics_script=temp_heur, test_heuristics=True)
+#     temp_heur.unlink()
 
-    temp_heur.unlink()
+#     # silly key error mistake to pick up when testing
+#     temp_heur_2 = Path("heuristic_test_2.py")
+#     temp_heur_2.write_text(
+#         heuristics_script.read_text().
+#         replace("info[dti_fmap]", "info['dti_fmap']")
+#     )
+#     print(heuristics_script.read_text().
+#           replace("""info[dti_fmap]""", """info['dti_fmap']"""))
+#     # TODO John: figure out what this was supposed to do
+#     #with pytest.raises(AttributeError):
+#     #    dry_run_heurs(
+#     #        heuristics_script=temp_heur_2)
 
-    # silly key error mistake to pick up when testing
-    temp_heur_2 = Path("heuristic_test_2.py")
-    temp_heur_2.write_text(
-        heuristics_script.read_text().
-        replace("info[dti_fmap]", "info['dti_fmap']")
-    )
-    print(heuristics_script.read_text().
-          replace("""info[dti_fmap]""", """info['dti_fmap']"""))
-    with pytest.raises(AttributeError):
-        dry_run_heurs(
-            heuristics_script=temp_heur_2.as_posix())
+#     with pytest.raises(KeyError):
+#         dry_run_heurs(
+#             heuristics_script=temp_heur_2.as_posix(), test_heuristics=True)
 
-    with pytest.raises(KeyError):
-        dry_run_heurs(
-            heuristics_script=temp_heur_2, test_heuristics=True)
+#     dry_run_heurs(
+#         heuristics_script=temp_heur_2.as_posix())
 
-    dry_run_heurs(
-        heuristics_script=temp_heur_2)
-
-    temp_heur_2.unlink()
-
-
-def test_load_heuristic():
-    from heudiconv_helpers import helpers as hh
-    HEURISTICS_PATH = Path(hh.__file__).parent
-    from_file = load_heuristic(
-        op.join(HEURISTICS_PATH, 'sample_heuristics.py'))
-
-    with pytest.raises(ImportError):
-        load_heuristic('unknownsomething')
-
-    with pytest.raises(ImportError):
-        load_heuristic(op.join(HEURISTICS_PATH, 'unknownsomething.py'))
+#     temp_heur_2.unlink()
 
 
 def test_hh_load_heuristic():
@@ -278,3 +264,47 @@ def test_hh_load_heuristic():
 
     with pytest.raises(ImportError):
         hh_load_heuristic(op.join(HEURISTICS_PATH, 'unknownsomething.py'))
+
+
+def test_mvrm_bids_image_mv():
+    tmp = tempfile.mkdtemp()
+    bids_test_path = Path(tmp, 'bids_test')
+    deleted_path = Path(tmp, 'deleted_scans')
+
+    _make_bids_tree(test_dir=bids_test_path, clear_tree=True)
+    scan_file = list(bids_test_path.glob('*/*/*scans.tsv'))[0]
+    orig_files = list(bids_test_path.glob('*/*/*/*.nii.gz'))
+    assert not deleted_path.exists()
+
+    # Test mv funcitonality
+    deleted_files = []
+    while orig_files:
+        file = orig_files.pop()
+        row = pd.Series({"image_path": file})
+        mvrm_bids_image(row)
+        deleted_files.append(Path(file.as_posix().replace('bids_test',
+                                                          'deleted_scans')))
+        current_files = list(bids_test_path.glob('*/*/*/*.nii.gz'))
+        cur_del_files = list(deleted_path.glob('*/*/*/*.nii.gz'))
+
+        # Make sure nothing unexpected was moved
+        assert orig_files == current_files
+
+        # Make sure everything we expect to be moved was moved
+        for df in cur_del_files:
+            assert df in cur_del_files
+        for cdf in cur_del_files:
+            assert cdf in deleted_files
+
+        # Make sure the scan_file is updated correctly
+        scan_text = scan_file.read_text()
+        orig_scan_lines = [Path(*ogf.parts[-2:]).as_posix()
+                           for ogf in orig_files]
+        for ogf in orig_scan_lines:
+            assert ogf in scan_text
+        for ln, line in enumerate(scan_text.split('\n')):
+            if ln != 0 and line != '':
+                scf = line.split('\t')[0]
+                assert scf in orig_scan_lines
+
+    shutil.rmtree(tmp)
