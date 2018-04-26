@@ -13,8 +13,6 @@ import sys
 import shutil
 import subprocess
 from importlib import reload
-__version__ = "helpers:0.0.6"
-print(__version__)
 
 
 def coerce_to_int(num, name):
