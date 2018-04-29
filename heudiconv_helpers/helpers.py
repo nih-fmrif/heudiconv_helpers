@@ -367,13 +367,15 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
 
     Examples
     -------
-    df.assign(cmd = lambda df:
-        make_heud_call(row = df,
-                     project_dir = project_dir_absolute,
-                     output_dir=outdir,
-                     conversion = False,
-                     container_image = sing_image))
-          )
+    import heudiconv_helpers as hh
+    df.apply(
+    lambda row:
+    hh.make_heud_call(row = row,
+                           project_dir = project_dir_absolute,
+                           output_dir=outdir_gen,
+                           conversion = False,
+                           container_image = sing_image),
+        axis = 1)
     """
     if not isinstance(row, pd.Series):
         raise ValueError("row needs to be a pandas series object")
