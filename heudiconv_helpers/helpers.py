@@ -561,7 +561,7 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
     thenifti = Path(hh.__file__).parent.parent.joinpath('data', 'test.nii.gz')
     templates_extracted = heur.infotodict(seqinfo)
 
-    index = 1 # only relevant for multi-echo
+    subindex = 1 # only relevant for multi-echo
     for subject in ['0001']:
         session = 'ses-0001'
         item = 1
