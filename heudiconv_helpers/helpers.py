@@ -413,9 +413,12 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
 
 def get_symlink_name(row, sub_col='bids_subj',
                      ses_col='bids_ses', path_col='dicom_path'):
-"""
-Example: df_bids.apply(lambda row: hh.get_symlink_name(row),axis=1)
-"""
+    """
+    Example usage:
+    df_bids['symlink_names'] = df_bids.apply(lambda row: hh.get_symlink_name(row),axis=1)
+    df_bids = df_bids.assign(symlink_path = lambda df: [symlinked_dicoms.joinpath(p) for p in df.symlink_names])
+    df_bids.apply(lambda row: make_symlink(row,project_dir_absolute), axis=1);
+    """
 
     symlink = \
         row[sub_col] + \
@@ -428,28 +431,36 @@ def test_get_symlink_name():
     get_symlink_name
 
 
-def make_symlink(row, overwrite_previous=False):
+def make_symlink(row,project_dir_absolute, overwrite_previous=False,verbose = False):
     """
-    Dicoms are symlinked for running heudiconv v-0.2
-    which has a slightly different interface and
-    dictates that the files be named in a particular
-    way
+    Example usage:
+    df_bids['symlink_names'] = df_bids.apply(lambda row: hh.get_symlink_name(row),axis=1)
+    df_bids = df_bids.assign(symlink_path = lambda df: [symlinked_dicoms.joinpath(p) for p in df.symlink_names])
+    df_bids.apply(lambda row: make_symlink(row,project_dir_absolute), axis=1);
     """
-    original_dir = Path.cwd()
-    stdout = os.chdir(row.symlink_path.parent)
-    if row.symlink_path.exists() and not overwrite_previous:
-        symlinked = False
-        print('Symlink exists already, supply "overwrite_previous" argument\
-         if you wish to overwrite it')
-    else:
-        if row.symlink_path.exists():
-            os.remove(row.symlink_path)
-        stdout = row.symlink_path.symlink_to(
-            Path('..').joinpath(row.dicom_path))
-        symlinked = True
-    stdout = os.chdir(original_dir)
-    return symlinked
+    curdir = Path.cwd()
+    target  = Path(row.dicom_path).absolute()
+    linkname = Path(row.symlink_path).relative_to(project_dir_absolute)
+    relative_target_path = os.path.relpath(target, linkname.parent)
+    if verbose:
+        print("Current directory:", curdir)
+        print("linkname:", linkname)
+        print("target:", target)
+        print("Relative path:", relative_target_path)
 
+    if linkname.exists() and not overwrite_previous:
+        symlinked = False
+        print('Symlink exists already, supply "overwrite_previous" argument'
+         ' if you wish to overwrite it')
+        return symlinked
+    else:
+        if linkname.exists():
+            os.remove(linkname)
+
+
+    stdout = linkname.symlink_to(relative_target_path)
+    symlinked = True
+    return symlinked
 
 def make_symlink_template(row, project_dir_absolute):
     """
