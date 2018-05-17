@@ -25,7 +25,8 @@ def _get_default_opt_orddict():
         "debug": False,
         "dev": False,
         "dev_dir": None,
-        "use_scratch": False
+        "use_scratch": False,
+        "bind_path": "/gs3,/gs4,/gs5,/gs6,/gs7,/gs8,/gs9,/gs10,/gs11,/spin1,/scratch,/fdb"
         })
         return options
 
@@ -360,6 +361,10 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
         repo to be mounted to the container.
     use_scratch: bool, default False
         Mount /lscratch/$SLURM_JOB_ID to containers tmp directory.
+    bind_path: SINGULARITY_BINDPATH, default is
+    "/gs3,/gs4,/gs5,/gs6,/gs7,/gs8,/gs9,/gs10,/gs11,/spin1,/scratch,/fdb"
+        this should not contain /data as this is used to mount the project
+        directory
 
     Returns
     -------
