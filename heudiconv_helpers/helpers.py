@@ -290,6 +290,10 @@ def _get_hbind():
         sing_home_tmp.mkdir()
     return f" -H {sing_home_tmp}"
 
+def get_singularity_bindpath(options):
+    bp = options.pop("bind_path")
+    full_bind = f'export SINGULARITY_BINDPATH="{bp}";'
+    return full_bind, options
 
 def _get_heur(options):
     script = options.pop("heuristics_script")
@@ -324,7 +328,12 @@ def _get_other_cmds(options, options_dict):
     cmd = ''
     for k, v in options.items():
         if v:
-            cmd += ' ' + options_dict[k]
+            try:
+                cmd += ' ' + options_dict[k]
+            except KeyError as e:
+                print("Unless this key is simply appending a value it should"
+                " have been removed from the options by this point. Otherwise"
+                " add to options_dict")
 
     return cmd
 
@@ -390,6 +399,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     hbind = _get_hbind()
     img = ' %s' % Path(container_image).absolute()
     setup = _get_setup()
+    full_bind, options = get_singularity_bindpath(options)
     dev_str, options = _get_dev_str(options)
     tmp_str, options = _get_tmp_str(options)
     heur, options = _get_heur(options)
@@ -404,13 +414,12 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     }
     other_flags = _get_other_cmds(options, options_dict)
 
-    cmd = \
-        f"""\
-{setup}singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
+    cmd = f"""\
+{full_bind}{setup}\
+ singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
  bash -c '/neurodocker/startup.sh\
  heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
-{heur}{conv}{outcmd} -p -b{other_flags}'\
-"""
+ {heur}{conv}{outcmd} -p -b{other_flags}' """
 
     output_dir = Path(output_dir).as_posix()
     return cmd
@@ -512,7 +521,23 @@ def _get_seqinfo():
     return seqinfo
 
 
-def validate_heuristics_output(heuristics_script=None):
+def get_sing_exists():
+    sing_exists = shutil.which('singularity')
+    if not sing_exists:
+        sing_exists = _get_mod_exists('singularity')
+    return sing_exists
+
+def _get_mod_exists(mod = "singularity")
+    test = subprocess.run(
+    "module load {mod}; which {mod}".format(mod=mod),
+    shell=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE)
+    mod_exists = mod in test.stdout.decode('utf-8').split('/')
+
+    return mod_exists
+
+def validate_heuristics_output(heuristics_script=None, validator="bids/validator:0.25.9"):
     """
     Run the bids validator on a dummy directory created from a
     heudiconv heuristics file.
@@ -529,12 +554,32 @@ def validate_heuristics_output(heuristics_script=None):
     """
     test_dir = _make_bids_tree(heuristics_script)
 
-    validation = subprocess.run(
-        'docker run --rm -v $PWD/bids_test:/data:ro\
-         bids/validator:0.25.9 /data',
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
+    docker_exists = shutil.which('docker')
+    sing_exists = _get_sing_exists()
+
+    if docker_exists:
+        validation = subprocess.run(
+            'docker run --rm -v $PWD/bids_test:/data:ro\
+             {validator} /data',
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+    elif sing_exists:
+        sing_img = validator.replace('bids/','').replace(':','-') + '.simg'
+        cmd = ('singularity pull docker://{validator};'
+            'singularity run -B $PWD/bids_test:/mnt:ro'
+             '{sing_img} /mnt')
+        if not shutil.exists('singularity'):
+            cmd = "module load singularity;" + cmd
+        validation = subprocess.run(
+            cmd.format(**locals()),
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        print("Attempting to remove validator ...")
+        os.remove(sing_img)
+
+
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
 
@@ -570,8 +615,9 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
         else:
             ValueError("The test_dir must either be a nonexistent directory or"
                        "clear_tree must be True.")
-    if not shutil.which('docker'):
-        raise EnvironmentError("Cannot find docker on path")
+    if not (shutil.which('docker') or shutil.which('singularity')):
+        raise EnvironmentError("Cannot find docker or singularity on path")
+
     if heuristics_script is None:
         import heudiconv_helpers.sample_heuristics as heur
     else:
