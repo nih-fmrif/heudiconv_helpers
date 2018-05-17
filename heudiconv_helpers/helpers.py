@@ -521,13 +521,13 @@ def _get_seqinfo():
     return seqinfo
 
 
-def get_sing_exists():
+def _get_sing_exists():
     sing_exists = shutil.which('singularity')
     if not sing_exists:
         sing_exists = _get_mod_exists('singularity')
     return sing_exists
 
-def _get_mod_exists(mod = "singularity")
+def _get_mod_exists(mod = "singularity"):
     test = subprocess.run(
     "module load {mod}; which {mod}".format(mod=mod),
     shell=True,
@@ -537,7 +537,7 @@ def _get_mod_exists(mod = "singularity")
 
     return mod_exists
 
-def validate_heuristics_output(heuristics_script=None, validator="bids/validator:0.25.9"):
+def validate_heuristics_output(heuristics_script=None, validator="bids/validator:0.25.9",cleanup=False, verbose=False):
     """
     Run the bids validator on a dummy directory created from a
     heudiconv heuristics file.
@@ -566,25 +566,32 @@ def validate_heuristics_output(heuristics_script=None, validator="bids/validator
             stderr=subprocess.PIPE)
     elif sing_exists:
         sing_img = validator.replace('bids/','').replace(':','-') + '.simg'
-        cmd = ('singularity pull docker://{validator};'
-            'singularity run -B $PWD/bids_test:/mnt:ro'
-             '{sing_img} /mnt')
-        if not shutil.exists('singularity'):
+        cmd = ("""umask 002;singularity pull docker://{validator};\
+            singularity run -B $PWD/bids_test:/mnt:ro\
+            {sing_img} /mnt""")
+
+        if not shutil.which('singularity'):
             cmd = "module load singularity;" + cmd
         validation = subprocess.run(
             cmd.format(**locals()),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
-        print("Attempting to remove validator ...")
-        os.remove(sing_img)
+        if cleanup:
+            print("Attempting to remove validator ...")
+            os.remove(sing_img)
 
 
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
 
         error = validation.stderr.decode('utf-8')
-        print("Stderr: ", error, '\n')
+        if docker_exists:
+            print("Stderr: ", error, '\n')
+        elif sing_exists and verbose:
+            print("Stderr: ", error, '\n')
+        else:
+            print("Not printing stderr. Set verbose = True")
         return validation.stdout.decode('utf-8')
 
 
@@ -615,7 +622,7 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
         else:
             ValueError("The test_dir must either be a nonexistent directory or"
                        "clear_tree must be True.")
-    if not (shutil.which('docker') or shutil.which('singularity')):
+    if not (shutil.which('docker') or _get_sing_exists()):
         raise EnvironmentError("Cannot find docker or singularity on path")
 
     if heuristics_script is None:
@@ -673,6 +680,22 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
                               + '\n')
                 # Write the scans file with the new line added
                 scans_file.write_text(scans_str)
+    Path(test_dir, 'dataset_description.json').write_text("""\
+{
+    "Name": "NIMH IRP demo json",
+    "Acknowledgements": "Thanks",
+    "Authors": [
+        "Dylan Nielson",
+        "John Lee"
+    ],
+    "BIDSVersion": "1.0.X",
+    "Funding": "NIMH Intramural Research Program",
+    "ReferencesAndLinks": [
+        "a_webpage.com"
+    ],
+    "License": "Don't you ever..."
+}\
+""")
 
     return test_dir
 
