@@ -411,8 +411,12 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     return cmd
 
 
-def get_symlink_name(row, symlinked_dicoms, sub_col='bids_subj',
+def get_symlink_name(row, sub_col='bids_subj',
                      ses_col='bids_ses', path_col='dicom_path'):
+"""
+Example: df_bids.apply(lambda row: hh.get_symlink_name(row),axis=1)
+"""
+
     symlink = \
         row[sub_col] + \
         '-' + row[ses_col] + \
