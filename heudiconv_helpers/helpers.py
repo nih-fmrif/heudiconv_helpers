@@ -709,7 +709,8 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
     heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
         A path to a heuristics script to test.
     seqinfo: seqinfo object
-        Object to run the heuristics on. If none a minimal default is used.
+        Object to run the heuristics on. If none a minimal default is used. It
+        should not contain multiple scan sessions.
     test_heuristics: bool
         If true the heuristics script will execute all heuristics and actions
         to confirm that they evaluate properly.
@@ -718,6 +719,14 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
     -------
     df_scans: dataframe containing the scans captured by the heuristics. If
      test_heuiristics=True will return None.
+
+    Example
+    -------
+    df = pd.concat([
+    hh.dry_run_heurs(
+        heuristics_script=heuristics_script,
+        seqinfo=list(df_ses.itertuples())) for x,df_ses in df_info_gen.groupby('accession_number')],
+    axis = 0)
     """
     if heuristics_script is None:
         import heudiconv_helpers.sample_heuristics as heur
