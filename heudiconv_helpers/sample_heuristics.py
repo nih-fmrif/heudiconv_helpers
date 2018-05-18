@@ -20,7 +20,7 @@ def filter_files(fn):
     This is used by heudiconv to filter files based on the filename.
     The function returns a boolean for a given filename.
     """
-    patterns_to_filter_out = ['README', 'requisition']
+    patterns_to_filter_out = ['README', 'requisition','realtime']
     return all(pat not in fn for pat in patterns_to_filter_out)
 
 
@@ -32,6 +32,12 @@ def create_key(template, outtype=('nii.gz'), annotation_classes=None):
 
 def infotodict(seqinfo, test_heuristics=False):
 
+    if len(seqinfo) > 30:
+            print("There are a lot of entries provided here (%s)." 
+                  " This heuristic file does not handle duplicate"
+                  " series_id across the same accession_number."
+                  " This can be avoided by passing subject/session"
+                  " combinations individually to heudiconv"% len(seqinfo))
     t1w = create_key(
         'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-fspgr_run-{item:03d}_T1w')
     pcasl = create_key(
