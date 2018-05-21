@@ -331,9 +331,12 @@ def _get_other_cmds(options, options_dict):
             try:
                 cmd += ' ' + options_dict[k]
             except KeyError as e:
-                print("Unless this key is simply appending a value it should"
-                " have been removed from the options by this point. Otherwise"
-                " add to options_dict")
+                print(
+                    "Unless this key is simply appending a"
+                    " value it should have been removed from the"
+                    " options by this point. Otherwise add to"
+                    " options_dict"
+                )
 
     return cmd
 
@@ -414,12 +417,12 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     }
     other_flags = _get_other_cmds(options, options_dict)
 
-    cmd = f"""\
-{full_bind}{setup}\
- singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}\
- bash -c '/neurodocker/startup.sh\
- heudiconv -d {row.dicom_template} -s {row.bids_subj} -ss {row.bids_ses}\
- {heur}{conv}{outcmd} -p -b{other_flags}' """
+    cmd = (f"""{full_bind}{setup}"""
+    f"""singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}"""
+    f"""bash -c '/neurodocker/startup.sh"""
+    f"""heudiconv -d {row.dicom_template}"""
+    f""" -s {row.bids_subj} -ss {row.bids_ses}"""
+    f"""{heur}{conv}{outcmd} -p -b{other_flags}'""")
 
     output_dir = Path(output_dir).as_posix()
     return cmd
@@ -566,9 +569,10 @@ def validate_heuristics_output(heuristics_script=None, validator="bids/validator
             stderr=subprocess.PIPE)
     elif sing_exists:
         sing_img = validator.replace('bids/','').replace(':','-') + '.simg'
-        cmd = ("""umask 002;singularity pull docker://{validator};\
-            singularity run -B $PWD/bids_test:/mnt:ro\
-            {sing_img} /mnt""")
+        cmd = (
+            """umask 002; singularity pull docker://{validator};"""
+            """ singularity run -B $PWD/bids_test:/mnt:ro"""
+            """ {sing_img} /mnt""")
 
         if not shutil.which('singularity'):
             cmd = "module load singularity;" + cmd
@@ -620,8 +624,8 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
         if clear_tree:
             shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
         else:
-            ValueError("The test_dir must either be a nonexistent directory or"
-                       "clear_tree must be True.")
+            ValueError("The test_dir must either be a nonexistent directory"
+                " or clear_tree must be True.")
     if not (shutil.which('docker') or _get_sing_exists()):
         raise EnvironmentError("Cannot find docker or singularity on path")
 
@@ -680,22 +684,22 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
                               + '\n')
                 # Write the scans file with the new line added
                 scans_file.write_text(scans_str)
-    Path(test_dir, 'dataset_description.json').write_text("""\
-{
-    "Name": "NIMH IRP demo json",
-    "Acknowledgements": "Thanks",
-    "Authors": [
-        "Dylan Nielson",
-        "John Lee"
-    ],
-    "BIDSVersion": "1.0.X",
-    "Funding": "NIMH Intramural Research Program",
-    "ReferencesAndLinks": [
-        "a_webpage.com"
-    ],
-    "License": "Don't you ever..."
-}\
-""")
+    Path(test_dir, 'dataset_description.json').write_text(
+        '''{'''
+        '''    "Name": "NIMH IRP demo json",'''
+        '''    "Acknowledgements": "Thanks",'''
+        '''    "Authors": ['''
+        '''        "Dylan Nielson",'''
+        '''        "John Lee"'''
+        '''    ],'''
+        '''    "BIDSVersion": "1.0.X",'''
+        '''    "Funding": "NIMH Intramural Research Program",'''
+        '''    "ReferencesAndLinks": ['''
+        '''        "a_webpage.com"'''
+        '''    ],'''
+        '''    "License": "Don't you ever..."'''
+        '''}'''
+    )
 
     return test_dir
 
