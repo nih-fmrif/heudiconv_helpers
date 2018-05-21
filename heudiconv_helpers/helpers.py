@@ -14,7 +14,6 @@ import shutil
 import subprocess
 from importlib import reload
 import sys
-print(sys.executable)
 
 from bids.grabbids import BIDSLayout
 
@@ -29,6 +28,7 @@ def _get_default_opt_orddict():
         "dev": False,
         "dev_dir": None,
         "use_scratch": False,
+        "grouping": "accession_number",
         "bind_path": "/gs3,/gs4,/gs5,/gs6,/gs7,/gs8,/gs9,/gs10,/gs11,/spin1,/scratch,/fdb"
         })
         return options
@@ -317,6 +317,11 @@ def _get_conv(options):
 
     return conv, options
 
+def _get_grouping(options):
+    grouping =  options.pop('grouping')
+    return (' --grouping %s'% grouping, options)
+
+
 
 def _get_outcmd(output_dir):
     if output_dir is not None:
@@ -409,6 +414,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     dev_str, options = _get_dev_str(options)
     tmp_str, options = _get_tmp_str(options)
     heur, options = _get_heur(options)
+    grouping, options = _get_grouping(options)
     conv, options = _get_conv(options)
     outcmd = _get_outcmd(output_dir)
 
@@ -422,10 +428,10 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
 
     cmd = (f"""{full_bind}{setup}"""
     f"""singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}"""
-    f"""bash -c '/neurodocker/startup.sh"""
-    f"""heudiconv -d {row.dicom_template}"""
+    f""" bash -c '/neurodocker/startup.sh"""
+    f""" heudiconv -d {row.dicom_template}"""
     f""" -s {row.bids_subj} -ss {row.bids_ses}"""
-    f"""{heur}{conv}{outcmd} -p -b{other_flags}'""")
+    f""" {heur}{conv}{grouping}{outcmd} -p -b{other_flags}'""")
 
     output_dir = Path(output_dir).as_posix()
     return cmd
