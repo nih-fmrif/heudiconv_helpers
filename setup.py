@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='heudiconv_helpers',
-      version='0.0.7',
+      version='0.0.8',
       description='Some packages to help get datasets bids compliant after heudiconv processing',
       url='https://github.com/nih-fmrif/heudiconv_helpers',
       author='John Lee, Dylan Nielson',
