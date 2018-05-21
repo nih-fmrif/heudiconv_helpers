@@ -13,7 +13,10 @@ import sys
 import shutil
 import subprocess
 from importlib import reload
+import sys
+print(sys.executable)
 
+from bids.grabbids import BIDSLayout
 
 def _get_default_opt_orddict():
         options = OrderedDict({
@@ -279,7 +282,7 @@ def _get_tmp_str(options):
 
 def _get_setup():
     if host_is_hpc():
-        setup = 'module load singularity;'
+        setup = 'module load singularity; module load webproxy; '
     else:
         setup = ""
     return setup
@@ -555,6 +558,9 @@ def validate_heuristics_output(heuristics_script=None, validator="bids/validator
     validation_output: string
         bids validation output as a string
     """
+    if not (shutil.which('docker') or _get_sing_exists()):
+        raise EnvironmentError("Cannot find docker or singularity on path")
+
     test_dir = _make_bids_tree(heuristics_script)
 
     docker_exists = shutil.which('docker')
@@ -626,8 +632,6 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
         else:
             ValueError("The test_dir must either be a nonexistent directory"
                 " or clear_tree must be True.")
-    if not (shutil.which('docker') or _get_sing_exists()):
-        raise EnvironmentError("Cannot find docker or singularity on path")
 
     if heuristics_script is None:
         import heudiconv_helpers.sample_heuristics as heur
@@ -885,3 +889,21 @@ def flatten(items):
             yield from flatten(x)
         else:
             yield x
+
+
+def get_bids_df(bids_dir, scans_only=None, keep_defaced=False):
+
+    layout = BIDSLayout(bids_dir)
+    df_pybids = layout.as_data_frame()
+    if not keep_defaced:
+        df_pybids = df_pybids.query('~path.str.contains("defaced")')
+    if scans_only:
+        df_pybids = df_pybids.loc[df_pybids.path.str.contains('nii.gz'), :]
+        df_pybids['json_path'] = \
+            (df_pybids.path.apply(
+                lambda x: Path(''.join([*x.split('.')[:-2], '.json']))))
+
+    return df_pybids
+
+
+

@@ -185,11 +185,20 @@ def test_validate_heuristics_output():
     from heudiconv_helpers import helpers as hh
     heuristics_script = Path(hh.__file__).with_name(
         'sample_heuristics.py')
-    validate_heuristics_output(heuristics_script=heuristics_script)
+    if shutil.which('docker') or hh._sing_exists():
+        validate_heuristics_output(heuristics_script=heuristics_script)
+    else:
+     with pytest.raises(EnvironmentError):
+        validate_heuristics_output(heuristics_script=heuristics_script)
+
 
 
 def test_validate_heuristics_output_no_arg():
-    validate_heuristics_output()
+    if shutil.which('docker') or hh._sing_exists():
+        validate_heuristics_output()
+    else:
+     with pytest.raises(EnvironmentError):
+        validate_heuristics_output()
 
 #troubleshoot this thoroughly
 # def test_dry_run_heurs():
