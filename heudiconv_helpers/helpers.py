@@ -756,14 +756,19 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
             for v_i in v:
                 dfs.append(pd.DataFrame([v_i[0], k[0]],
                                         index=["series_id", "template"]).T)
-        series_map = pd.concat([df for df in dfs], axis=0)
+        num_empty = sum(map(lambda x: x is None,heur_output.values()))
+        if num_empty < len(heur_output):
+            series_map = pd.concat([df for df in dfs], axis=0)
 
-        df_scans = series_map.merge(
-            pd.DataFrame(seqinfo),
-            on='series_id',
-            how='outer')
-        first_cols = ['series_id','template','series_description','sequence_name']
-        df_scans = df_scans[first_cols + [c for c in df_scans if c not in first_cols] ]
+            df_scans = series_map.merge(
+                pd.DataFrame(seqinfo),
+                on='series_id',
+                how='outer')
+            first_cols = ['series_id','template','series_description','sequence_name']
+            df_scans = df_scans[first_cols + [c for c in df_scans if c not in first_cols] ]
+        else: 
+            print("No matches found")
+            raise ValueError
     else:
         df_scans = None
 
