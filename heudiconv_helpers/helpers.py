@@ -566,8 +566,11 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
             stderr=subprocess.PIPE)
     elif sing_exists:
         sing_img = validator.replace('bids/','').replace(':','-') + '.simg'
-        cmd = (
-            """umask 002; singularity pull docker://{validator};"""
+        if Path(sing_img).exists():
+            cmd  = ''
+        else: 
+            cmd = """umask 002; singularity pull docker://{validator};"""
+        cmd += (
             """ singularity run -B $PWD/bids_test:/mnt:ro"""
             """ {sing_img} /mnt""")
 
