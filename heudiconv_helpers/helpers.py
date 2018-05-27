@@ -549,28 +549,13 @@ def _get_mod_exists(mod = "singularity"):
 
     return mod_exists
 
-def validate_heuristics_output(heuristics_script=None, validator="bids/validator:0.25.9",cleanup=False, verbose=False):
-    """
-    Run the bids validator on a dummy directory created from a
-    heudiconv heuristics file.
 
-    Parameters
-    ----------
-    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
-        A path to a heuristics script to test.
-
-    Returns
-    -------
-    validation_output: string
-        bids validation output as a string
-    """
-    if not (shutil.which('docker') or _get_sing_exists()):
-        raise EnvironmentError("Cannot find docker or singularity on path")
-
-    test_dir = _make_bids_tree(heuristics_script)
-
+def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,cleanup=False,bids_verbosity=None):
     docker_exists = shutil.which('docker')
     sing_exists = _get_sing_exists()
+    if bids_verbosity:
+        v = '--verbose'
+    else: v = ''
 
     if docker_exists:
         validation = subprocess.run(
@@ -597,10 +582,6 @@ def validate_heuristics_output(heuristics_script=None, validator="bids/validator
             print("Attempting to remove validator ...")
             os.remove(sing_img)
 
-
-    if test_dir.exists():
-        shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
-
         error = validation.stderr.decode('utf-8')
         if docker_exists:
             print("Stderr: ", error, '\n')
@@ -609,6 +590,38 @@ def validate_heuristics_output(heuristics_script=None, validator="bids/validator
         else:
             print("Not printing stderr. Set verbose = True")
         return validation.stdout.decode('utf-8')
+
+
+def validate_heuristics_output(heuristics_script=None,
+                               validator="bids/validator:0.25.9",
+                               cleanup=False,
+                               verbose=False):
+    """
+    Run the bids validator on a dummy directory created from a
+    heudiconv heuristics file.
+
+    Parameters
+    ----------
+    heuristics_script: string,pathlib.Path, default is a sample from heudiconv_helpers.
+        A path to a heuristics script to test.
+
+    Returns
+    -------
+    validation_output: string
+        bids validation output as a string
+    """
+    if not (shutil.which('docker') or _get_sing_exists()):
+        raise EnvironmentError("Cannot find docker or singularity on path")
+
+    test_dir = _make_bids_tree(heuristics_script)
+    validation = validate_bids_dir(
+        test_dir,
+        validator=validator,
+        verbose=verbose,
+        cleanup=cleanup)
+
+    if test_dir.exists():
+        shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
 
 
 def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
