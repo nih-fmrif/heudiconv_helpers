@@ -20,7 +20,17 @@ def filter_files(fn):
     This is used by heudiconv to filter files based on the filename.
     The function returns a boolean for a given filename.
     """
-    patterns_to_filter_out = ['README', 'requisition','realtime']
+    patterns_to_filter_out = ['README',
+                              'requisition',
+                              'realtime',
+                              'edti',
+                              'optional',
+                              '3 plane loc',
+                              'ASSET cal',
+                              'clinical',
+                              'plane_loc',
+                             'nihpcasl']
+#                               'rest_assetEPI']
     return all(pat not in fn for pat in patterns_to_filter_out)
 
 
@@ -31,13 +41,12 @@ def create_key(template, outtype=('nii.gz'), annotation_classes=None):
 
 
 def infotodict(seqinfo, test_heuristics=False):
-
-    if len(seqinfo) > 30:
-            print("There are a lot of entries provided here (%s)." 
-                  " This heuristic file does not handle duplicate"
-                  " series_id across the same accession_number."
-                  " This can be avoided by passing subject/session"
-                  " combinations individually to heudiconv"% len(seqinfo))
+    ## sometimes seqinfo is a list of seqinfo objects, sometimes it is a seqinfo object
+    if not hasattr(seqinfo,'keys'):
+        seqinfo_dict = {'no_grouping' : seqinfo}
+    else:
+        seqinfo_dict = seqinfo
+    
     t1w = create_key(
         'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-fspgr_run-{item:03d}_T1w')
     pcasl = create_key(
@@ -110,19 +119,26 @@ def infotodict(seqinfo, test_heuristics=False):
     }
 
     if test_heuristics:
+        for group_id, seqinfo in seqinfo_dict.items():
+            for seq in seqinfo:
+                for criterion, action in heurs.items():
+                    eval(criterion)
+                    eval(action)
+                print("The defined heuristics evaluate")
+                return None
+    for group_id, seqinfo in seqinfo_dict.items():
+        if len(seqinfo) > 30:
+            print("There are a lot of entries provided here (%s)." 
+                  " This heuristic file does not handle duplicate"
+                  " series_id across the same accession_number."
+                  " This can be avoided by passing subject/session"
+                  " combinations individually to heudiconv"% len(seqinfo))
         for seq in seqinfo:
             for criterion, action in heurs.items():
-                eval(criterion)
-                eval(action)
-            print("The defined heuristics evaluate")
-            return None
-    for seq in seqinfo:
-        for criterion, action in heurs.items():
-            if eval(criterion):
-                eval(action)
-                break
-        #
-
-    return info
+                if eval(criterion):
+                    eval(action)
+                    break
+        
+return info
 
 
