@@ -571,11 +571,13 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
         else: 
             cmd = """umask 002; singularity pull docker://{validator};"""
         cmd += (
-            """ singularity run -B $PWD/bids_test:/mnt:ro"""
+            """ singularity run -B $PWD/{bids_dir}:/mnt:ro"""
             """ {sing_img} /mnt""")
+
 
         if not shutil.which('singularity'):
             cmd = "module load singularity;" + cmd
+        print(cmd)
         validation = subprocess.run(
             cmd.format(**locals()),
             shell=True,
