@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import platform
 import os
-import datetime
+# import datetime
 import os.path as op
 from collections import namedtuple, Iterable
 from heudiconv_helpers import helpers as hh
@@ -14,7 +14,12 @@ import shutil
 import subprocess
 from importlib import reload
 import sys
-
+from random import randrange
+from calendar import isleap
+from datetime import datetime
+from datetime import timedelta
+from datetime import date
+import dateutil.parser
 from bids.grabbids import BIDSLayout
 
 def _get_default_opt_orddict():
@@ -518,7 +523,7 @@ def _get_seqinfo_dict():
                 'series_description', 'sequence_name', 'image_type',
                 'accession_number', 'patient_age', 'patient_sex']
 
-    seqinfo_dict = {k: np.nan for k in key_list}
+    seqinfo_dict = OrderedDict('no_grouping': {k: np.nan for k in key_list})
     seqinfo_dict['series_id'] = 'id_for_dti'
     seqinfo_dict['series_description'] = 'a DTI series description'
     seqinfo_dict['dim1'] = 10
@@ -568,7 +573,7 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
         sing_img = validator.replace('bids/','').replace(':','-') + '.simg'
         if Path(sing_img).exists():
             cmd  = ''
-        else: 
+        else:
             cmd = """umask 002; singularity pull docker://{validator};"""
         cmd += (
             """ singularity run -B $PWD/{bids_dir}:/mnt:ro"""
@@ -707,7 +712,7 @@ def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
                 scans_str += ((Path(*file.parts[-2:])
                                .with_suffix('.nii.gz').as_posix())
                               + '\t'
-                              + (datetime.datetime.now()
+                              + (datetime.now()
                                  .strftime("%Y-%m-%dT%H:%M:%S"))
                               + '\n')
                 # Write the scans file with the new line added
@@ -784,7 +789,7 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
                 how='outer')
             first_cols = ['series_id','template','series_description','sequence_name']
             df_scans = df_scans[first_cols + [c for c in df_scans if c not in first_cols] ]
-        else: 
+        else:
             print("No matches found")
             raise ValueError
     else:
@@ -935,4 +940,104 @@ def get_bids_df(bids_dir, scans_only=None, keep_defaced=False):
     return df_pybids
 
 
+def gen_subj_time_jitter(subjects,acq_date_time_offset):
+    """
+    Generate a dataframe  with time offsets for application to each subject in
+    a BIDS file structure
 
+    Parameters
+    -------
+    subjects: iterable of str
+        Subjects in the BIDS dataset.
+    acq_date_time_offset: pathlib.Path, str
+        Path to pickle file containing previously calculated offsets
+
+    Example
+    -------
+        df_offset = (
+            gen_subj_time_jitter(df_pybids['subject'].
+            dropna().
+            drop_duplicates().
+            values,
+             acq_date_time_offset)
+                    )
+    """
+    if not Path(acq_date_time_offset).exists():
+        df_offset = pd.DataFrame(columns = ['participant_id','offset_years', 'offset_days'])
+    else:
+        df_offset = pd.read_pickle(acq_date_time_offset)
+    for sub in subjects:
+        df_row = df_offset.query('participant_id == "sub-" + @sub')
+        if not len(df_row):
+            df_row = pd.DataFrame({
+                'participant_id' : 'sub-' + sub,
+                'offset_years' : 150,
+                'offset_days' : randrange(start=-600,stop=600)},
+            index=[int(sub) + 1])
+            df_offset = pd.concat(
+            [df_offset, df_row], axis = 0)
+    pd.to_pickle(df_offset,acq_date_time_offset)
+    return df_offset
+
+
+def _add_years(d, years):
+    new_year = d.year + years
+    try:
+        return d.replace(year=new_year)
+    except ValueError:
+        if (d.month == 2 and d.day == 29 and # leap day
+            isleap(d.year) and not isleap(new_year)):
+            return d.replace(year=new_year, day=28)
+        raise
+
+def _jitter_date(row,subject,df_offset_row):
+    dt = row['acq_time']
+    if dt.year > 1980:
+        day_mod  = dt + timedelta(days = int(df_offset_row.offset_days.values[0]))
+        year_mod = _add_years(day_mod,-1* int(df_offset_row.offset_years.values[0]))
+        row['acq_time']  = year_mod.isoformat()
+    return row
+
+def rewrite_tsv(scan_tsv_path,df_offset,subject, dry_run= True):
+    """
+    Alter scan tsv to have jittered dates.jittered
+
+    Parameters
+    -------
+    scan_tsv_path: pathlib.Path or str
+        A path to a scans tsv in a BIDS file structure.
+    df_offset: dataframe
+        Dataframe of offsets constructed with the gen_subj_time_jitter
+        function in  heudiconv_helpers.helpers.
+    subject: str
+        A subject that should be described in the tsv
+
+    Example
+    -------
+        df_tsvs = df_scans.drop_duplicates('scans_tsv_path',keep='first')
+        df_tsvs.apply(lambda row:
+        rewrite_tsv(row['scans_tsv_path'],
+                    df_offset,row['subject'])  ,
+                     axis =1)
+    """
+    print(scan_tsv_path)
+    if not subject.find('sub-')>=0:
+        subject = 'sub-' + subject
+
+    df_offset_row =  df_offset.loc[df_offset.participant_id == subject ,:]
+    df_tsv = pd.read_table(scan_tsv_path)
+    df_tsv['acq_time'] = df_tsv.acq_time.apply(dateutil.parser.parse)
+
+    df_tsv = df_tsv.apply(lambda row: _jitter_date(row,subject,df_offset_row),axis = 1)
+    print(df_tsv)
+    if not dry_run:
+        df_tsv.to_csv(scan_tsv_path,index=False,sep='\t')
+    else:
+        print('WARNING: Not rewriting. Set dry_run to False')
+    return None
+
+def diff_month(d1, d2):
+    """
+    Used for generating NDA month entry
+    """
+    return (d1.year - d2.year) * 12 + d1.month - d2.month

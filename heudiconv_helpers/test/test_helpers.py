@@ -8,7 +8,7 @@ import json
 import tempfile
 import shutil
 import os.path as op
-
+from datetime import datetime
 from heudiconv_helpers.helpers import hh_load_heuristic
 
 
@@ -17,7 +17,13 @@ from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        dry_run_heurs, _set_fields, _get_fields,
                                        _del_fields, _get_outcmd, _get_seqinfo,
                                        _make_bids_tree, mvrm_bids_image,_get_heur,
-                                       _get_default_opt_orddict)
+                                       _get_default_opt_orddict,diff_month)
+
+def test_diff_month():
+    assert diff_month(datetime(2010,10,1), datetime(2010,9,1)) == 1
+    assert diff_month(datetime(2010,10,1), datetime(2009,10,1)) == 12
+    assert diff_month(datetime(2010,10,1), datetime(2009,11,1)) == 11
+    assert diff_month(datetime(2010,10,1), datetime(2009,8,1)) == 14
 
 
 def test_gen_slice_timings():
