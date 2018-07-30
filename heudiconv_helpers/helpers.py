@@ -408,7 +408,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
                            container_image = sing_image),
         axis = 1)
     """
-    if not isinstance(row, pd.Series):
+    if not (isinstance(row, pd.Series) or isinstance(row, pd.core.series.Series)):
         raise ValueError("row needs to be a pandas series object")
     options = _get_default_opt_orddict()
     options.update(kwargs)
