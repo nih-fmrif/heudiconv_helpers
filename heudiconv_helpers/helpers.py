@@ -524,7 +524,7 @@ def _get_seqinfo_dict():
                 'series_description', 'sequence_name', 'image_type',
                 'accession_number', 'patient_age', 'patient_sex']
 
-    seqinfo_dict = OrderedDict('no_grouping': {k: np.nan for k in key_list})
+    seqinfo_dict = OrderedDict({'no_grouping': {k: np.nan for k in key_list}})
     seqinfo_dict['series_id'] = 'id_for_dti'
     seqinfo_dict['series_description'] = 'a DTI series description'
     seqinfo_dict['dim1'] = 10
