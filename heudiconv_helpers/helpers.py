@@ -965,9 +965,12 @@ def gen_subj_time_jitter(subjects,acq_date_time_offset):
              acq_date_time_offset)
                     )
     """
-    if not Path(acq_date_time_offset).exists():
+    acq_date_time_offset  = Path(acq_date_time_offset)
+    if not acq_date_time_offset.exists():
         df_offset = pd.DataFrame(columns = ['participant_id','offset_years', 'offset_days'])
     else:
+        if not acq_date_time_offset.suffix == '.pklz':
+            raise ValueError('{acq_date_time_offset} should be a pickle witht the suffix .pklz')
         df_offset = pd.read_pickle(acq_date_time_offset)
     for sub in subjects:
         df_row = df_offset.query('participant_id == "sub-" + @sub')
