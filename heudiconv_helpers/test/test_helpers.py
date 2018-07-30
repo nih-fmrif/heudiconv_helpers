@@ -17,7 +17,8 @@ from heudiconv_helpers.helpers import (gen_slice_timings, make_heud_call,
                                        dry_run_heurs, _set_fields, _get_fields,
                                        _del_fields, _get_outcmd, _get_seqinfo,
                                        _make_bids_tree, mvrm_bids_image,_get_heur,
-                                       _get_default_opt_orddict,diff_month)
+                                       _get_default_opt_orddict,diff_month,
+                                       _get_sing_exists)
 
 def test_diff_month():
     assert diff_month(datetime(2010,10,1), datetime(2010,9,1)) == 1
@@ -191,7 +192,7 @@ def test_validate_heuristics_output():
     from heudiconv_helpers import helpers as hh
     heuristics_script = Path(hh.__file__).with_name(
         'sample_heuristics.py')
-    if shutil.which('docker') or hh._sing_exists():
+    if shutil.which('docker') or _get_sing_exists():
         validate_heuristics_output(heuristics_script=heuristics_script)
     else:
      with pytest.raises(EnvironmentError):
@@ -200,7 +201,7 @@ def test_validate_heuristics_output():
 
 
 def test_validate_heuristics_output_no_arg():
-    if shutil.which('docker') or hh._sing_exists():
+    if shutil.which('docker') or _get_sing_exists():
         validate_heuristics_output()
     else:
      with pytest.raises(EnvironmentError):
