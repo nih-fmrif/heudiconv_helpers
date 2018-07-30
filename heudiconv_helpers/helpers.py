@@ -32,7 +32,7 @@ def _get_default_opt_orddict():
         "debug": False,
         "dev": False,
         "dev_dir": None,
-        "use_scratch": False,
+        "scratch_dir": "",
         "grouping": "accession_number",
         "bind_path": "/gs3,/gs4,/gs5,/gs6,/gs7,/gs8,/gs9,/gs10,/gs11,/spin1,/scratch,/fdb"
         })
@@ -275,8 +275,9 @@ def _get_dev_str(options):
 
 
 def _get_tmp_str(options):
-    if options.pop('use_scratch'):
-        tmp_str = ' --bind /lscratch/$SLURM_JOB_ID:/tmp'
+    scratch_dir = options.pop('scratch_dir')
+    if scratch_dir:
+        tmp_str = f' --bind {scratch_dir}:/tmp'
     else:
         tmp_str = ' --bind /tmp:/tmp'
         if host_is_hpc():
@@ -384,8 +385,8 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
         Mount heudiconv code repo to container.
     dev_dir: pathlib.Path, string
         repo to be mounted to the container.
-    use_scratch: bool, default False
-        Mount /lscratch/$SLURM_JOB_ID to containers tmp directory.
+    scratch_dir: str, default empty string
+        Mount this dir to containers tmp directory.
     bind_path: SINGULARITY_BINDPATH, default is
     "/gs3,/gs4,/gs5,/gs6,/gs7,/gs8,/gs9,/gs10,/gs11,/spin1,/scratch,/fdb"
         this should not contain /data as this is used to mount the project
