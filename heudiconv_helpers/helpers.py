@@ -928,6 +928,8 @@ def flatten(items):
 
 def get_bids_df(bids_dir, scans_only=None, keep_defaced=False):
 
+    if isinstance(bids_dir,Path):
+        bids_dir = bids_dir.as_posix()
     layout = BIDSLayout(bids_dir)
     df_pybids = layout.as_data_frame()
     if not keep_defaced:
