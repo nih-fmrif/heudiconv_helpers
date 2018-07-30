@@ -2,6 +2,36 @@
 # sub-<participant_label>[_ses-<session_label>]_task-<task_label>[_acq-<label>][_rec-<label>][_run-<index>][_echo-<index>]_bold.nii[.gz]
 import os
 from collections import namedtuple
+import logging
+lgr = logging.getLogger('heudiconv')
+
+
+def infotoids(seqinfos, outdir):
+    # decide on subjid and session based on patient_id
+    lgr.info("Processing sequence infos to deduce study/session")
+
+    subject = get_unique(seqinfos, 'patient_id')
+    locator = 'none_defined_yet'
+
+    return {
+        # TODO: request info on study from the JedCap
+        'locator': locator,
+        # Sessions to be deduced yet from the names etc TODO
+        'session': 'not_working_yet',
+        'subject': subject,
+    }
+
+
+def get_unique(seqinfos, attr):
+    """Given a list of seqinfos, which must have come from a single study
+    get specific attr, which must be unique across all of the entries
+
+    If not -- fail!
+
+    """
+    values = set(getattr(si, attr) for si in seqinfos)
+    assert (len(values) == 1)
+    return values.pop()
 
 
 def filter_dicom(dcmdata):
@@ -29,7 +59,7 @@ def filter_files(fn):
                               'ASSET cal',
                               'clinical',
                               'plane_loc',
-                             'nihpcasl']
+                              'nihpcasl']
 #                               'rest_assetEPI']
     return all(pat not in fn for pat in patterns_to_filter_out)
 
@@ -41,81 +71,30 @@ def create_key(template, outtype=('nii.gz'), annotation_classes=None):
 
 
 def infotodict(seqinfo, test_heuristics=False):
-    ## sometimes seqinfo is a list of seqinfo objects, sometimes it is a seqinfo object
-    if not hasattr(seqinfo,'keys'):
-        seqinfo_dict = {'no_grouping' : seqinfo}
+    # sometimes seqinfo is a list of seqinfo objects, sometimes it is a seqinfo object
+    if not hasattr(seqinfo, 'keys'):
+        seqinfo_dict = {'no_grouping': seqinfo}
     else:
         seqinfo_dict = seqinfo
-    
-    t1w = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-fspgr_run-{item:03d}_T1w')
-    pcasl = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_pcasl')
-    dti_ap = create_key(
-        'sub-{subject}/{session}/dwi/sub-{subject}_{session}_acq-ap_run-{item:03d}_dwi')
-    dti_pa = create_key(
-        'sub-{subject}/{session}/dwi/sub-{subject}_{session}_acq-pa_run-{item:03d}_dwi')
-    dti = create_key(
-        'sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi')
-    flair_2d = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-2d_run-{item:03d}_FLAIR')
-    t2_star = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_T2star')
+
+    mprage = create_key(
+        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-mprage_run-{item:03d}_T1w')
+#     dti = create_key(
+#         'sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi')
     rest = create_key(
         'sub-{subject}/{session}/func/sub-{subject}_{session}_task-rest_run-{item:03d}_bold')
-    cube_t2 = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_T2w')
-    hippo = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-highreshippo_run-{item:03d}_T1w')
-    flair_3d = create_key(
-        'sub-{subject}/{session}/anat/sub-{subject}_{session}_acq-3d_run-{item:03d}_FLAIR')
-    avdc = create_key(
-        'derivatives/sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_avdc')
-    cbf = create_key(
-        'derivatives/sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_cbf')
-    fa = create_key(
-        'derivatives/sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_fa')
-    trace = create_key(
-        'derivatives/sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:03d}_trace')
-    resting_fmap = create_key(
-        'sub-{subject}/{session}/fmap/sub-{subject}_{session}_acq-resting_run-{item:03d}_fieldmap')
-    dti_fmap = create_key(
-        'sub-{subject}/{session}/fmap/sub-{subject}_{session}_acq-dwi_run-{item:03d}_fieldmap')
+    audition = create_key(
+        'sub-{subject}/{session}/func/sub-{subject}_{session}_task-audition_run-{item:03d}_bold')
 
-    info = {t1w: [], pcasl: [], dti_ap: [], dti_pa: [], dti: [], flair_2d: [], t2_star: [],
-            rest: [], cube_t2: [], hippo: [], flair_3d: [], avdc: [], cbf: [], fa: [], trace: [],
-            resting_fmap: [], dti_fmap: []}
+    info = {mprage: [], rest: [], audition: []}
     heurs = {
 
-        "('FSPGR' in seq.series_description.upper())": "info[t1w].append([seq.series_id])",
-        "('PCASL' in seq.series_description.upper())": "info[pcasl].append([seq.series_id])",
-        "('RESHIPPO' in seq.series_description.upper())": "info[hippo].append([seq.series_id])",
-        "('T2 2D' in seq.series_description.upper())": "info[flair_2d].append([seq.series_id])",
-        "('T2_FLAIR' in seq.series_description.upper())": "info[flair_2d].append([seq.series_id])",
-        "('Ax T2 FLAIR' in seq.series_description)": "info[flair_2d].append([seq.series_id])",
-        "('T2 STAR' in seq.series_description.upper())": "info[t2_star].append([seq.series_id])",
-        "('CUBE_T2' in seq.series_description.upper())": "info[cube_t2].append([seq.series_id])",
-        "('3D FLAIR' in seq.series_description.upper())": "info[flair_3d].append([seq.series_id])",
+        "('MPRAGE' in seq.series_description.upper().replace('_','').replace('-','').replace(' ',''))": "info[mprage].append([seq.series_id])",
 
-        "('AXIAL RSFMRI' in seq.series_description.upper())": "info[rest].append([seq.series_id])",
+        "('rest_assetEPI' in seq.series_description)": "info[rest].append([seq.series_id])",
+        "('Audition fmri' in seq.series_description)": "info[audition].append([seq.series_id])",
 
-        "('AVDC' in seq.series_description.upper())": "info[avdc].append([seq.series_id])",
-        "('CBF' in seq.series_description.upper())": "info[cbf].append([seq.series_id])",
-        "('FA' in seq.series_description.upper())": "info[fa].append([seq.series_id])",
-        "('TRACE' in seq.series_description.upper())": "info[trace].append([seq.series_id])",
-
-        "('B0 MAP - DTI' in seq.series_description.upper())": "info[dti_fmap]",
-        "('B0 MAP - RSFMRI' in seq.series_description.upper())": "info[resting_fmap]",
-        "('B0_MAP_RSFMRI' in seq.series_description.upper())": "info[resting_fmap]",
-        "('B0 Map - rsfMRI' in seq.series_description)": "info[resting_fmap]",
-        "('B0rf' == seq.sequence_name)": "info[resting_fmap]",
-
-        "('AXIAL DTI B=1000' in seq.series_description.upper())": "info[dti_pa].append([seq.series_id])",
-        "('AXIAL DTI 24VOLS FLIPPED' in seq.series_description.upper())": "info[dti_ap].append([seq.series_id])",
-        "('DTI' in seq.series_description)": "info[dti].append([seq.series_id])",
-
-
-
+        #         "('edti_cdiflist' in seq.series_description)": "info[dti].append([seq.series_id])",
     }
 
     if test_heuristics:
@@ -128,17 +107,16 @@ def infotodict(seqinfo, test_heuristics=False):
                 return None
     for group_id, seqinfo in seqinfo_dict.items():
         if len(seqinfo) > 30:
-            print("There are a lot of entries provided here (%s)." 
+            print("There are a lot of entries provided here (%s)."
                   " This heuristic file does not handle duplicate"
                   " series_id across the same accession_number."
                   " This can be avoided by passing subject/session"
-                  " combinations individually to heudiconv"% len(seqinfo))
+                  " combinations individually to heudiconv" % len(seqinfo))
         for seq in seqinfo:
             for criterion, action in heurs.items():
                 if eval(criterion):
                     eval(action)
                     break
-        
-return info
+        #
 
-
+    return info
