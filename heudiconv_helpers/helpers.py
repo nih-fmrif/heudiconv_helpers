@@ -780,7 +780,7 @@ def dry_run_heurs(heuristics_script=None, seqinfo=None, test_heuristics=False):
             for v_i in v:
                 dfs.append(pd.DataFrame([v_i[0], k[0]],
                                         index=["series_id", "template"]).T)
-        num_empty = sum(map(lambda x: x is None,heur_output.values()))
+        num_empty = sum(map(lambda x: not bool(x),heur_output.values()))
         if num_empty < len(heur_output):
             series_map = pd.concat([df for df in dfs], axis=0)
 
