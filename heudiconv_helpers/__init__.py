@@ -12,5 +12,5 @@ __all__ = (gen_slice_timings, json_action, host_is_hpc, make_heud_call,
            make_symlink, make_symlink_template, validate_heuristics_output,
            hh_load_heuristic)
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 print(__version__)
