@@ -564,9 +564,11 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
     else: v = ''
 
     if docker_exists:
+        cmd = ('docker run --rm'
+            ' -v $PWD/bids_test:/data:ro'
+             f' {validator} /data')
         validation = subprocess.run(
-            'docker run --rm -v $PWD/bids_test:/data:ro\
-             {validator} /data',
+            cmd,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
@@ -580,27 +582,29 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
             """ singularity run -B $PWD/{bids_dir}:/mnt:ro"""
             """ {sing_img} /mnt""")
 
-
         if not shutil.which('singularity'):
             cmd = "module load singularity;" + cmd
-        print(cmd)
+
         validation = subprocess.run(
             cmd.format(**locals()),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
-        if cleanup:
-            print("Attempting to remove validator ...")
-            os.remove(sing_img)
 
-        error = validation.stderr.decode('utf-8')
-        if docker_exists:
-            print("Stderr: ", error, '\n')
-        elif sing_exists and verbose:
-            print("Stderr: ", error, '\n')
-        else:
-            print("Not printing stderr. Set verbose = True")
-        return validation.stdout.decode('utf-8')
+    print(cmd)
+    ## Cleanup for singularity or docker
+    if cleanup:
+        print("Attempting to remove validator ...")
+        os.remove(sing_img)
+
+    error = validation.stderr.decode('utf-8')
+    if docker_exists:
+        print("Stderr: ", error, '\n')
+    elif sing_exists and verbose:
+        print("Stderr: ", error, '\n')
+    else:
+        print("Not printing stderr. Set verbose = True")
+    return validation.stdout.decode('utf-8')
 
 
 def validate_heuristics_output(heuristics_script=None,
@@ -633,6 +637,7 @@ def validate_heuristics_output(heuristics_script=None,
 
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
+    return validation
 
 
 def _make_bids_tree(heuristics_script=None, test_dir=Path('bids_test/'),
