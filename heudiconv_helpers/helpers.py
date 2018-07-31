@@ -965,6 +965,7 @@ def gen_subj_time_jitter(subjects,acq_date_time_offset):
              acq_date_time_offset)
                     )
     """
+
     acq_date_time_offset  = Path(acq_date_time_offset)
     if not acq_date_time_offset.exists():
         df_offset = pd.DataFrame(columns = ['participant_id','offset_years', 'offset_days'])
@@ -986,6 +987,27 @@ def gen_subj_time_jitter(subjects,acq_date_time_offset):
     return df_offset
 
 
+def gen_bids_subj(row,patient_key_path,generate_keys=False,key_col='patient_id'):
+    patient_key_path = Path(patient_key_path)
+    if patient_key_path.exists():
+        assert patient_key_path.suffix == 'pklz'
+        patient_dict = pd.read_pickle(patient_key_path)
+        sub = patient_dict.get(row[key_col],None)
+        if not sub and generate_keys:
+            patient_dict[row[key_col]] = '{n:04d}'.format(n = 1 + max([int(s) for s in patient_dict.values]))
+        elif not sub and not generate_keys:
+            raise ValueError("No subject found with that id. Consider setting generate_keys to True")
+    else:
+        patient_dict = pd.Series()
+        sub = '0001'
+        patient_dict[row[key_col]] = sub
+
+    pd.to_pickle(patient_dict,path=patient_key_path)
+    row['bids_subj'] = sub
+    return row
+
+
+
 def _add_years(d, years):
     new_year = d.year + years
     try:
@@ -996,6 +1018,7 @@ def _add_years(d, years):
             return d.replace(year=new_year, day=28)
         raise
 
+
 def _jitter_date(row,subject,df_offset_row):
     dt = row['acq_time']
     if dt.year > 1980:
@@ -1003,6 +1026,7 @@ def _jitter_date(row,subject,df_offset_row):
         year_mod = _add_years(day_mod,-1* int(df_offset_row.offset_years.values[0]))
         row['acq_time']  = year_mod.isoformat()
     return row
+
 
 def rewrite_tsv(scan_tsv_path,df_offset,subject, dry_run= True):
     """
@@ -1041,6 +1065,7 @@ def rewrite_tsv(scan_tsv_path,df_offset,subject, dry_run= True):
     else:
         print('WARNING: Not rewriting. Set dry_run to False')
     return None
+
 
 def diff_month(d1, d2):
     """
