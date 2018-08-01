@@ -566,7 +566,7 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
     if docker_exists:
         cmd = ('docker run --rm'
             ' -v $PWD/bids_test:/data:ro'
-             f' {validator} /data')
+             f' {validator} /data {v}')
         validation = subprocess.run(
             cmd,
             shell=True,
@@ -580,7 +580,7 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
             cmd = """umask 002; singularity pull docker://{validator};"""
         cmd += (
             """ singularity run -B $PWD/{bids_dir}:/mnt:ro"""
-            """ {sing_img} /mnt""")
+            """ {sing_img} /mnt {v}""")
 
         if not shutil.which('singularity'):
             cmd = "module load singularity;" + cmd
@@ -610,7 +610,8 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
 def validate_heuristics_output(heuristics_script=None,
                                validator="bids/validator:0.25.9",
                                cleanup=False,
-                               verbose=False):
+                               verbose=False,
+                               bids_verbosity=False):
     """
     Run the bids validator on a dummy directory created from a
     heudiconv heuristics file.
@@ -633,7 +634,8 @@ def validate_heuristics_output(heuristics_script=None,
         test_dir,
         validator=validator,
         verbose=verbose,
-        cleanup=cleanup)
+        cleanup=cleanup,
+        bids_verbosity=bids_verbosity)
 
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=False, onerror=None)
