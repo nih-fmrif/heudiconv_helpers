@@ -590,6 +590,9 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
+    else:
+    	raise EnvironmentError("Docker or singularity is required to use this functionality")
+
 
     print(cmd)
     ## Cleanup for singularity or docker
