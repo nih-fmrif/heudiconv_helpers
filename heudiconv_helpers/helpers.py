@@ -277,7 +277,7 @@ def _get_dev_str(options):
 def _get_tmp_str(options):
     scratch_dir = options.pop('scratch_dir')
     if scratch_dir:
-        tmp_str = f' --bind {scratch_dir}:/tmp'
+    	tmp_str = f' --bind {scratch_dir}:/tmp'
     else:
         tmp_str = ' --bind /tmp:/tmp'
         if host_is_hpc():
@@ -581,12 +581,13 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
         cmd += (
             """ singularity run -B $PWD/{bids_dir}:/mnt:ro"""
             """ {sing_img} /mnt {v}""")
+        cmd = cmd.format(**locals())
 
         if not shutil.which('singularity'):
             cmd = "module load singularity;" + cmd
 
         validation = subprocess.run(
-            cmd.format(**locals()),
+            cmd,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
@@ -946,7 +947,10 @@ def get_bids_df(bids_dir, scans_only=None, keep_defaced=False):
     if not keep_defaced:
         df_pybids = df_pybids.query('~path.str.contains("defaced")')
     if scans_only:
-        df_pybids = df_pybids.loc[df_pybids.path.str.contains('nii.gz'), :]
+        df_pybids = (df_pybids.
+        	loc[df_pybids.path.str.contains('nii.gz'), :].
+        	query("~path.str.contains('.git')")
+        	)
         df_pybids['json_path'] = \
             (df_pybids.path.apply(
                 lambda x: Path(''.join([*x.split('.')[:-2], '.json']))))
