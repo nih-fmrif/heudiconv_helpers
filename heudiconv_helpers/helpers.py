@@ -356,7 +356,8 @@ def _get_other_cmds(options, options_dict):
 
 
 def make_heud_call(*, row=None, project_dir=None, output_dir=None,
-                   container_image=None, **kwargs):
+                   container_image=None,sub_col='bids_subj',ses_col='bids_ses',
+                   **kwargs):
     """
     Creates a command for executing heudiconv in a container.
 
@@ -436,7 +437,7 @@ def make_heud_call(*, row=None, project_dir=None, output_dir=None,
     f"""singularity exec{pbind}{hbind}{dev_str}{tmp_str}{img}"""
     f""" bash -c '/neurodocker/startup.sh"""
     f""" heudiconv -d {row.dicom_template}"""
-    f""" -s {row.bids_subj} -ss {row.bids_ses}"""
+    f""" -s {row[sub_col]} -ss {row[ses_col]}"""
     f""" {heur}{conv}{grouping}{outcmd} -p -b{other_flags}'""")
 
     output_dir = Path(output_dir).as_posix()
@@ -872,6 +873,7 @@ def _mvrm_bids_image(image_path, delete=False, dest=None):
         Defaults to 'deleted_scans' in the parent of the bids tree.
     """
     # Get the base of the image_path and modality
+    image_path = Path(image_path)
     image_base = image_path.parent / image_path.parts[-1].split('.')[0]
     modality = image_path.parts[-1].split('.')[0].split('_')[-1]
 
