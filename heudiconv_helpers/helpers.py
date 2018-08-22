@@ -909,7 +909,7 @@ def _mvrm_bids_image(image_path, delete=False, dest=None):
         image_base.parent.rmdir()
 
 
-def mvrm_bids_image(row, delete=False, dest=None):
+def mvrm_bids_image(row, path_col = 'image_path', delete=False, dest=None):
     """
     Remove an images specified in the image_path field of a row
     from a bids tree. Either by deleting the image and associated files or
@@ -926,7 +926,7 @@ def mvrm_bids_image(row, delete=False, dest=None):
         root of the bids tree where you would like the deleted file moved.
         Defaults to 'deleted_scans' in the parent of the bids tree.
     """
-    _mvrm_bids_image(row.image_path, delete=delete, dest=dest)
+    _mvrm_bids_image(row[path_col], delete=delete, dest=dest)
 
 
 def flatten(items):
