@@ -1089,3 +1089,49 @@ def diff_month(d1, d2):
     Used for generating NDA month entry
     """
     return (d1.year - d2.year) * 12 + d1.month - d2.month
+
+
+def add_slice_timing(series, pattern='alt+z', tr=None, nslices=None, nvolumes=None,
+                     get_tr=None, get_nslices=None, get_nvolumes=None, debug = False):
+    json_path = series.json_path
+
+    with json_path.open() as j:
+        data = json.load(j)
+
+    if tr is None:
+        try:
+            tr = get_tr(data)
+        except TypeError:
+            raise ValueError('Either tr must be given, or get_tr must\
+            be a function takes the json dictionary and returns the repitition time')
+    if nslices is None:
+        try:
+            nslices = get_nslices(data)
+        except TypeError:
+            raise ValueError('Either nslices must be given, or get_nslices must\
+            be a function takes the json dictionary and returns the number of slices')
+    if nvolumes is None:
+        try:
+            nvolumes = get_nvolumes(data)
+        except TypeError:
+            raise ValueError('Either nvolumes must be given, or get_nvolumes must\
+            be a function takes the json dictionary and returns the number of volumes')
+
+    slice_timings = gen_slice_timings(tr, nslices, nvolumes, pattern='alt+z')
+
+    data['SliceTiming'] = slice_timings
+
+    if debug:
+        return data
+    else:
+        json_path.write_text(json.dumps(data,indent =0))
+
+
+def apply_addst(row,nvolumes=1):
+    add_slice_timing(row, pattern='alt+z',
+    	get_tr = lambda x:x['RepetitionTime'] / 1000 if x['RepetitionTime'] > 10 else x['RepetitionTime'],
+    	get_nslices = lambda x:x['dcmmeta_shape'][2],
+    	nvolumes = nvolumes)
+
+# def test_apply_addst():
+# 	assert apply_addst(row)
