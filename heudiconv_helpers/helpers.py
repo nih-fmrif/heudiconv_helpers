@@ -566,8 +566,8 @@ def validate_bids_dir(bids_dir,validator="bids/validator:0.25.9",verbose=False,c
 
     if docker_exists:
         cmd = ('docker run --rm'
-            ' -v $PWD/bids_test:/data:ro'
-             f' {validator} /data {v}')
+            f' -v {Path(bids_dir).absolute()}:/data:ro'
+            f' {validator} /data {v}')
         validation = subprocess.run(
             cmd,
             shell=True,
@@ -1078,7 +1078,7 @@ def rewrite_tsv(scan_tsv_path,df_offset,subject, dry_run= True):
     df_tsv = df_tsv.apply(lambda row: _jitter_date(row,subject,df_offset_row),axis = 1)
     print(df_tsv)
     if not dry_run:
-        df_tsv.to_csv(scan_tsv_path,index=False,sep='\t')
+        df_tsv.to_csv(scan_tsv_path,index=False,sep='\t',na_rep="n/a")
     else:
         print('WARNING: Not rewriting. Set dry_run to False')
     return None
@@ -1135,3 +1135,26 @@ def apply_addst(row,nvolumes=1):
 
 # def test_apply_addst():
 # 	assert apply_addst(row)
+
+def get_info_mapping(heudiconv_run_dir):
+	## If using a specific heudiconv run use this:
+	heudiconv_run_dir = Path(heudiconv_run_dir)
+
+	info_text_paths_gen = [x for x in heudiconv_run_dir.glob('**/info/*tsv')]
+	if len(info_text_paths_gen) == 0:
+	    info_text_paths_gen = [x for x in heudiconv_run_dir.glob('**/info/*txt')]
+	if len(info_text_paths_gen) == 0:
+	    raise ValueError("Cannot find any info files")
+	    
+	df_info_gen = pd.concat([pd.read_csv(p, sep = '\t').assign(file_path=p) for p in info_text_paths_gen]).reset_index(drop = True)
+
+	df_info_mapping = pd.concat(
+	    [
+	        heudiconv_helpers.helpers.dry_run_heurs(
+	            heuristics_script=heuristics_script,
+	            seqinfo=list(df.itertuples())) for x,df in df_info_gen.groupby('file_path') ],
+	axis = 0)
+	df_info_mapping = df_info_mapping.assign(file_path = lambda df: df.file_path.astype(str))
+	df_info_mapping = df_info_mapping.assign(participant_id = lambda df: 'sub-' + df.file_path.str.extract('.*.heudiconv/(?P<subj>\d{4})/.*', expand = True))
+	df_info_mapping.to_csv(info_mapping_csv,index=False,sep=',')
+	df_info_mapping.head()
