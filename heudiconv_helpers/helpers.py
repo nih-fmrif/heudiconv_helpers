@@ -1076,6 +1076,7 @@ def rewrite_tsv(scan_tsv_path,df_offset,subject, dry_run= True):
     df_tsv['acq_time'] = df_tsv.acq_time.apply(dateutil.parser.parse)
 
     df_tsv = df_tsv.apply(lambda row: _jitter_date(row,subject,df_offset_row),axis = 1)
+    df_tsv['acq_time'] = df_tsv.acq_time.apply(lambda x: x.isoformat())
     print(df_tsv)
     if not dry_run:
         df_tsv.to_csv(scan_tsv_path,index=False,sep='\t',na_rep="n/a")
