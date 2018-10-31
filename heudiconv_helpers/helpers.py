@@ -1009,11 +1009,18 @@ def gen_bids_subj(row,patient_key_path,generate_keys=False,key_col='patient_id')
     if patient_key_path.exists():
         assert patient_key_path.suffix == 'pklz'
         patient_dict = pd.read_pickle(patient_key_path)
+        if not key_col in patient_dict.columns:
+            raise ValueError("File containing bids subject mapping does not"
+            f" contain {key_col}. Consider using the key_col arguement.")
+
+
         sub = patient_dict.get(row[key_col],None)
         if not sub and generate_keys:
-            patient_dict[row[key_col]] = '{n:04d}'.format(n = 1 + max([int(s) for s in patient_dict.values]))
+            patient_dict[row[key_col]] = '{n:04d}'.format(
+                n = 1 + max([int(s) for s in patient_dict.values]))
         elif not sub and not generate_keys:
-            raise ValueError("No subject found with that id. Consider setting generate_keys to True")
+            raise ValueError("No subject found with that id. Consider setting "
+                "generate_keys to True")
     else:
         patient_dict = pd.Series()
         sub = '0001'
