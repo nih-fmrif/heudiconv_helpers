@@ -20,7 +20,7 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import date
 import dateutil.parser
-from bids.grabbids import BIDSLayout
+from bids import BIDSLayout
 
 def _get_default_opt_orddict():
         options = OrderedDict({
