@@ -516,7 +516,7 @@ def make_symlink_template(row, project_dir_absolute):
     return template
 
 
-def _get_seqinfo_dict():
+def _get_seqinfo_default():
     key_list = ['total_files_till_now', 'example_dcm_file', 'series_id',
                 'dcm_dir_name', 'unspecified2', 'unspecified3', 'dim1', 'dim2',
                 'dim3', 'dim4', 'TR', 'TE', 'protocol_name',
@@ -525,18 +525,18 @@ def _get_seqinfo_dict():
                 'series_description', 'sequence_name', 'image_type',
                 'accession_number', 'patient_age', 'patient_sex']
 
-    seqinfo_dict = OrderedDict({'no_grouping': {k: np.nan for k in key_list}})
-    seqinfo_dict['series_id'] = 'id_for_dti'
-    seqinfo_dict['series_description'] = 'a DTI series description'
-    seqinfo_dict['dim1'] = 10
-    return seqinfo_dict
+    seqinfo_default = OrderedDict({k: np.nan for k in key_list})
+    seqinfo_default['series_id'] = 'id_for_dti'
+    seqinfo_default['series_description'] = 'a DTI series description'
+    seqinfo_default['dim1'] = 10
+    return seqinfo_default
 
 
 def _get_seqinfo():
-    seqinfo_dict = _get_seqinfo_dict()
-    seqinfo_element = namedtuple('seqinfo_class', seqinfo_dict.keys())
-    seqinfo = [seqinfo_element(**seqinfo_dict),
-               seqinfo_element(**seqinfo_dict)]
+    seqinfo_default = _get_seqinfo_default()
+    seqinfo_element = namedtuple('seqinfo_class', seqinfo_default.keys())
+    seqinfo = [seqinfo_element(**seqinfo_default),
+               seqinfo_element(**seqinfo_default)]
     return seqinfo
 
 

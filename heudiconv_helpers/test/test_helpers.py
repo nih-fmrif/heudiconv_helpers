@@ -224,7 +224,7 @@ def test_validate_heuristics_output_no_arg():
 #              "template": "sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:03d}_dwi"},
 #             index=[0]),
 #         pd.DataFrame(
-#             hh._get_seqinfo_dict(),
+#             hh._get_seqinfo_default(),
 #             index=[0]),
 #         on="series_id")
 
